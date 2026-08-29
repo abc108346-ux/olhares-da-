@@ -44,7 +44,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         <input
           id="critica-search-input"
           type="text"
-          value={value}
+          value={value || ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           autoFocus={autoFocus}

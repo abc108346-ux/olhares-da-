@@ -14,6 +14,12 @@ service cloud.firestore {
       allow create, update, delete: if isAuthenticated();
     }
 
+    // Pages collection
+    match /paginas/{paginaId} {
+      allow read: if resource == null || resource.data.publicada == true || isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
     // Categories collection
     match /categorias/{categoriaId} {
       allow read: if true;

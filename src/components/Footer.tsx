@@ -1,15 +1,21 @@
 import React from 'react';
 import { Instagram, ArrowUpRight, ArrowUp } from 'lucide-react';
 import { Logo } from './Logo';
+import { Pagina } from '../types';
 
 interface FooterProps {
   onNavigate: (path: string) => void;
+  paginas?: Pagina[];
 }
 
-export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
+export const Footer: React.FC<FooterProps> = ({ onNavigate, paginas = [] }) => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const footerPages = paginas
+    .filter(p => p.publicada && p.mostrarNoFooter)
+    .sort((a, b) => (a.ordemFooter || 0) - (b.ordemFooter || 0));
 
   return (
     <footer id="main-footer" className="bg-black text-white border-t border-zinc-900 pt-16 pb-12">
@@ -62,15 +68,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               </li>
               <li>
                 <button 
-                  id="footer-link-sobre"
-                  onClick={() => { onNavigate('/sobre'); scrollToTop(); }} 
-                  className="text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  Sobre o Projeto
-                </button>
-              </li>
-              <li>
-                <button 
                   id="footer-link-pesquisa"
                   onClick={() => { onNavigate('/pesquisa'); scrollToTop(); }} 
                   className="text-zinc-400 hover:text-white transition-colors cursor-pointer"
@@ -78,6 +75,16 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                   Pesquisar no Acervo
                 </button>
               </li>
+              {footerPages.map((p) => (
+                <li key={p.id}>
+                  <button 
+                    onClick={() => { onNavigate(`/${p.slug}`); scrollToTop(); }} 
+                    className="text-zinc-400 hover:text-white transition-colors cursor-pointer capitalize"
+                  >
+                    {p.titulo}
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
 

@@ -3,11 +3,14 @@ import {
   Critica, 
   UserProfile, 
   CategoriaTipo, 
-  FichaTecnica as FichaTecnicaType 
+  FichaTecnica as FichaTecnicaType,
+  Pagina
 } from '../types';
 import { 
   saveCriticaToDb, 
   deleteCriticaFromDb, 
+  savePaginaToDb,
+  deletePaginaFromDb,
   seedDatabaseIfEmpty, 
   logoutAdminUser 
 } from '../services/firebase';
@@ -41,18 +44,21 @@ import {
   Menu,
   X,
   Loader2,
-  CheckCheck
+  CheckCheck,
+  FileCode2
 } from 'lucide-react';
 
 interface AdminDashboardPageProps {
   currentUser: UserProfile;
   criticas: Critica[];
+  paginas?: Pagina[];
   onCriticasChange: (criticas: Critica[]) => void;
+  onPaginasChange?: (paginas: Pagina[]) => void;
   onNavigate: (path: string) => void;
   onSelectCritica: (slug: string) => void;
 }
 
-type AdminView = 'dashboard' | 'criticas' | 'nova-critica' | 'editar-critica' | 'categorias' | 'midia' | 'configuracoes';
+type AdminView = 'dashboard' | 'criticas' | 'nova-critica' | 'editar-critica' | 'paginas' | 'nova-pagina' | 'editar-pagina' | 'categorias' | 'midia' | 'configuracoes';
 
 const CATEGORIAS_PADRAO: CategoriaTipo[] = [
   'Teatro',
@@ -77,12 +83,15 @@ const generateSlug = (text: string): string => {
 export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   currentUser,
   criticas,
+  paginas = [],
   onCriticasChange,
+  onPaginasChange,
   onNavigate,
   onSelectCritica,
 }) => {
   const [activeView, setActiveView] = useState<AdminView>('dashboard');
   const [editingCriticaId, setEditingCriticaId] = useState<string | null>(null);
+  const [editingPaginaId, setEditingPaginaId] = useState<string | null>(null);
   const [searchTable, setSearchTable] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -93,6 +102,34 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   // Delete Modal State
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [criticaToDelete, setCriticaToDelete] = useState<Critica | null>(null);
+  
+  const [deletePaginaModalOpen, setDeletePaginaModalOpen] = useState(false);
+  const [paginaToDelete, setPaginaToDelete] = useState<Pagina | null>(null);
+
+  // Pagina Form State
+  const [paginaFormData, setPaginaFormData] = useState<{
+    titulo: string;
+    slug: string;
+    resumo: string;
+    conteudo: string;
+    imagemPrincipal: string;
+    publicada: boolean;
+    mostrarNoHeader: boolean;
+    ordemHeader: number;
+    mostrarNoFooter: boolean;
+    ordemFooter: number;
+  }>({
+    titulo: '',
+    slug: '',
+    resumo: '',
+    conteudo: '',
+    imagemPrincipal: '',
+    publicada: true,
+    mostrarNoHeader: false,
+    ordemHeader: 0,
+    mostrarNoFooter: false,
+    ordemFooter: 0,
+  });
 
   // Form State
   const [formData, setFormData] = useState<{
@@ -240,18 +277,18 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
     setSaveSuccessMessage(null);
     setIsSaving(false);
     setFormData({
-      titulo: critica.titulo,
-      slug: critica.slug,
+      titulo: critica.titulo || '',
+      slug: critica.slug || '',
       resumo: critica.resumo || '',
       conteudo: critica.conteudo || '',
-      autor: critica.autor || currentUser.displayName || 'Editor(a)',
+      autor: critica.autor || currentUser?.displayName || 'Editor(a)',
       categoria: critica.categoria || 'Teatro',
       tags: (critica.tags || []).join(', '),
       dataPublicacao: critica.dataPublicacao || new Date().toISOString().split('T')[0],
       imagemPrincipal: critica.imagemPrincipal || '',
       legendaImagemPrincipal: critica.legendaImagemPrincipal || '',
       imagensAdicionais: critica.imagens || [],
-      publicada: critica.publicada,
+      publicada: critica.publicada || false,
       destaque: Boolean(critica.destaque),
       nomeEspetaculo: critica.nomeEspetaculo || '',
       companhia: critica.companhia || '',
@@ -273,6 +310,130 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       }
     });
     setActiveView('editar-critica');
+  };
+
+  // Pagina Handlers
+  const filteredPaginas = useMemo(() => {
+    return paginas.filter(p => {
+      if (!searchTable.trim()) return true;
+      const term = searchTable.toLowerCase();
+      return p.titulo.toLowerCase().includes(term) || p.slug.toLowerCase().includes(term);
+    }).sort((a, b) => new Date(b.dataCriacao).getTime() - new Date(a.dataCriacao).getTime());
+  }, [paginas, searchTable]);
+
+  const handleOpenNewPagina = () => {
+    setEditingPaginaId(null);
+    setSaveSuccessMessage(null);
+    setIsSaving(false);
+    setPaginaFormData({
+      titulo: '',
+      slug: '',
+      resumo: '',
+      conteudo: 'Escreva o conteúdo da página aqui...',
+      imagemPrincipal: '',
+      publicada: true,
+      mostrarNoHeader: false,
+      ordemHeader: 0,
+      mostrarNoFooter: false,
+      ordemFooter: 0,
+    });
+    setActiveView('nova-pagina');
+  };
+
+  const handleOpenEditPagina = (pagina: Pagina) => {
+    setEditingPaginaId(pagina.id);
+    setSaveSuccessMessage(null);
+    setIsSaving(false);
+    setPaginaFormData({
+      titulo: pagina.titulo || '',
+      slug: pagina.slug || '',
+      resumo: pagina.resumo || '',
+      conteudo: pagina.conteudo || '',
+      imagemPrincipal: pagina.imagemPrincipal || '',
+      publicada: pagina.publicada || false,
+      mostrarNoHeader: pagina.mostrarNoHeader || false,
+      ordemHeader: pagina.ordemHeader || 0,
+      mostrarNoFooter: pagina.mostrarNoFooter || false,
+      ordemFooter: pagina.ordemFooter || 0,
+    });
+    setActiveView('editar-pagina');
+  };
+
+  const handleSavePagina = async (asDraft = false) => {
+    if (!paginaFormData.titulo.trim()) {
+      showNotification('O título da página é obrigatório.', 'error');
+      return;
+    }
+
+    const finalSlug = paginaFormData.slug.trim() || generateSlug(paginaFormData.titulo);
+
+    setIsSaving(true);
+    setSaveSuccessMessage(null);
+
+    try {
+      const isNew = !editingPaginaId;
+      const id = editingPaginaId || crypto.randomUUID();
+
+      const newPagina: Pagina = {
+        id,
+        titulo: paginaFormData.titulo.trim(),
+        slug: finalSlug,
+        resumo: paginaFormData.resumo.trim(),
+        conteudo: paginaFormData.conteudo,
+        imagemPrincipal: paginaFormData.imagemPrincipal.trim() || undefined,
+        publicada: asDraft ? false : paginaFormData.publicada,
+        dataCriacao: isNew ? new Date().toISOString() : paginas.find(p => p.id === id)?.dataCriacao || new Date().toISOString(),
+        dataAtualizacao: new Date().toISOString(),
+        mostrarNoHeader: paginaFormData.mostrarNoHeader,
+        ordemHeader: paginaFormData.ordemHeader,
+        mostrarNoFooter: paginaFormData.mostrarNoFooter,
+        ordemFooter: paginaFormData.ordemFooter,
+      };
+
+      const savedPagina = await savePaginaToDb(newPagina);
+
+      let updatedPaginas;
+      if (isNew) {
+        updatedPaginas = [savedPagina, ...paginas];
+      } else {
+        updatedPaginas = paginas.map(p => p.id === savedPagina.id ? savedPagina : p);
+      }
+      onPaginasChange?.(updatedPaginas);
+
+      if (isNew) {
+        setEditingPaginaId(savedPagina.id);
+      }
+
+      setSaveSuccessMessage(`Página "${savedPagina.titulo}" ${asDraft ? 'salva como rascunho' : 'publicada'} com sucesso!`);
+      showNotification('Página salva com sucesso!', 'success');
+      setTimeout(() => setSaveSuccessMessage(null), 3000);
+      
+    } catch (err) {
+      console.error(err);
+      showNotification('Erro ao salvar a página. Tente novamente.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleConfirmDeletePagina = async () => {
+    if (!paginaToDelete) return;
+    
+    try {
+      await deletePaginaFromDb(paginaToDelete.id);
+      const updatedList = paginas.filter(p => p.id !== paginaToDelete.id);
+      onPaginasChange?.(updatedList);
+      showNotification('Página excluída com sucesso.', 'success');
+    } catch (err) {
+      console.error(err);
+      showNotification('Erro ao excluir página.', 'error');
+    } finally {
+      setDeletePaginaModalOpen(false);
+      setPaginaToDelete(null);
+      if (activeView === 'editar-pagina') {
+        setActiveView('paginas');
+      }
+    }
   };
 
   // Save Critique Form
@@ -466,6 +627,32 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
               <PlusCircle className="w-4 h-4" />
               <span>NOVA CRÍTICA</span>
             </button>
+
+            <div className="h-px w-full bg-zinc-800 my-2"></div>
+
+            <button
+              id="admin-nav-paginas"
+              onClick={() => { setActiveView('paginas'); setMobileSidebarOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors cursor-pointer ${
+                activeView === 'paginas' || activeView === 'editar-pagina' ? 'bg-white text-black font-bold' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+              }`}
+            >
+              <FileCode2 className="w-4 h-4" />
+              <span>PÁGINAS</span>
+            </button>
+
+            <button
+              id="admin-nav-nova-pagina"
+              onClick={() => { handleOpenNewPagina(); setMobileSidebarOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors cursor-pointer ${
+                activeView === 'nova-pagina' ? 'bg-white text-black font-bold' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+              }`}
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>NOVA PÁGINA</span>
+            </button>
+
+            <div className="h-px w-full bg-zinc-800 my-2"></div>
 
             <button
               id="admin-nav-categorias"
@@ -1340,6 +1527,251 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         )}
 
         {/* ==========================================================
+            VIEW: PÁGINAS TABLE & MANAGEMENT
+           ========================================================== */}
+        {activeView === 'paginas' && (
+          <div className="space-y-6 animate-in fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-850 pb-6">
+              <div>
+                <h1 className="font-serif text-3xl font-bold uppercase text-white tracking-tight">
+                  Gerenciamento de Páginas
+                </h1>
+                <p className="text-xs font-mono text-zinc-400 mt-1">
+                  Crie, edite e organize páginas institucionais dinâmicas (ex: Sobre, Contato).
+                </p>
+              </div>
+
+              <button
+                onClick={handleOpenNewPagina}
+                className="px-5 py-2.5 bg-white text-black font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+              >
+                <PlusCircle className="w-4 h-4" />
+                Nova Página
+              </button>
+            </div>
+
+            {/* Table Area */}
+            <div className="border border-zinc-850 bg-black overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-zinc-950/80 border-b border-zinc-850">
+                    <tr>
+                      <th className="p-4 font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Página</th>
+                      <th className="p-4 font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Header / Footer</th>
+                      <th className="p-4 font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Status</th>
+                      <th className="p-4 font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-900">
+                    {filteredPaginas.map((pagina) => (
+                      <tr key={pagina.id} className="hover:bg-zinc-900/50 transition-colors">
+                        <td className="p-4">
+                          <div className="font-serif font-bold text-sm text-white uppercase">{pagina.titulo}</div>
+                          <div className="text-[10px] text-zinc-500 font-mono mt-0.5">/{pagina.slug}</div>
+                        </td>
+                        <td className="p-4 font-mono text-[10px] text-zinc-400 space-y-1">
+                          {pagina.mostrarNoHeader && <div className="text-emerald-400">Header (Ordem: {pagina.ordemHeader || 0})</div>}
+                          {pagina.mostrarNoFooter && <div className="text-blue-400">Footer (Ordem: {pagina.ordemFooter || 0})</div>}
+                          {!pagina.mostrarNoHeader && !pagina.mostrarNoFooter && <span>Nenhum menu</span>}
+                        </td>
+                        <td className="p-4">
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-0.5 border ${
+                            pagina.publicada ? 'border-emerald-800 bg-emerald-950/40 text-emerald-300' : 'border-zinc-700 bg-zinc-900 text-zinc-400'
+                          }`}>
+                            {pagina.publicada ? 'Publicada' : 'Rascunho'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right space-x-2">
+                          <button
+                            onClick={() => handleOpenEditPagina(pagina)}
+                            className="p-2 bg-zinc-900 hover:bg-white hover:text-black border border-zinc-800 text-zinc-300 transition-colors cursor-pointer"
+                            title="Editar página"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPaginaToDelete(pagina);
+                              setDeletePaginaModalOpen(true);
+                            }}
+                            className="p-2 bg-zinc-900 hover:bg-red-500 hover:text-white hover:border-red-500 border border-zinc-800 text-zinc-300 transition-colors cursor-pointer"
+                            title="Excluir página"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {filteredPaginas.length === 0 && (
+                  <div className="p-12 text-center text-zinc-500 font-mono text-xs uppercase tracking-widest">
+                    Nenhuma página encontrada.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==========================================================
+            VIEW: CREATE / EDIT PAGINA FORM
+           ========================================================== */}
+        {(activeView === 'nova-pagina' || activeView === 'editar-pagina') && (
+          <div className="space-y-8 max-w-5xl animate-in fade-in pb-16">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-850 pb-6">
+              <div>
+                <h1 className="font-serif text-3xl font-bold uppercase text-white tracking-tight">
+                  {activeView === 'editar-pagina' ? 'Editar Página' : 'Nova Página Dinâmica'}
+                </h1>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => handleSavePagina(true)}
+                  disabled={isSaving}
+                  className="px-4 py-2.5 bg-zinc-900 text-white border border-zinc-700 font-bold uppercase tracking-wider text-[11px] hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Salvar Rascunho
+                </button>
+                <button
+                  onClick={() => handleSavePagina(false)}
+                  disabled={isSaving}
+                  className="px-5 py-2.5 bg-white text-black font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Publicar Página
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-mono text-zinc-400 uppercase tracking-widest mb-1.5">Título da Página *</label>
+                    <input
+                      type="text"
+                      required
+                      value={paginaFormData.titulo}
+                      onChange={(e) => setPaginaFormData({ ...paginaFormData, titulo: e.target.value })}
+                      className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 font-serif text-lg focus:border-white focus:outline-none transition-colors"
+                      placeholder="Ex: Sobre o Projeto"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono text-zinc-400 uppercase tracking-widest mb-1.5">URL Slug (Opcional - Gerado automaticamente)</label>
+                    <div className="flex">
+                      <span className="bg-zinc-900 border border-zinc-800 border-r-0 text-zinc-500 p-3 font-mono text-xs flex items-center">
+                        olharesdacena.com/
+                      </span>
+                      <input
+                        type="text"
+                        value={paginaFormData.slug}
+                        onChange={(e) => setPaginaFormData({ ...paginaFormData, slug: generateSlug(e.target.value) })}
+                        className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 font-mono text-xs focus:border-white focus:outline-none transition-colors"
+                        placeholder="sobre-o-projeto"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-mono text-zinc-400 uppercase tracking-widest mb-1.5">Conteúdo Principal (Markdown) *</label>
+                  <RichTextEditor
+                    value={paginaFormData.conteudo}
+                    onChange={(val) => setPaginaFormData({ ...paginaFormData, conteudo: val })}
+                    minHeight="500px"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-zinc-950 border border-zinc-850 p-5 space-y-5">
+                  <h3 className="font-mono text-xs uppercase tracking-[0.2em] text-white border-b border-zinc-900 pb-2">Status & Menus</h3>
+                  
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <div className={`w-5 h-5 flex items-center justify-center border transition-colors ${paginaFormData.publicada ? 'bg-white border-white' : 'bg-black border-zinc-700 group-hover:border-zinc-500'}`}>
+                      {paginaFormData.publicada && <Check className="w-3.5 h-3.5 text-black" />}
+                    </div>
+                    <span className="text-sm text-zinc-300 select-none font-medium uppercase tracking-wider">
+                      Página Publicada
+                    </span>
+                  </label>
+
+                  <div className="pt-4 border-t border-zinc-900 space-y-4">
+                    <div>
+                      <label className="flex items-center gap-3 cursor-pointer group mb-2">
+                        <div className={`w-5 h-5 flex items-center justify-center border transition-colors ${paginaFormData.mostrarNoHeader ? 'bg-white border-white' : 'bg-black border-zinc-700 group-hover:border-zinc-500'}`}>
+                          {paginaFormData.mostrarNoHeader && <Check className="w-3.5 h-3.5 text-black" />}
+                        </div>
+                        <span className="text-sm text-zinc-300 select-none font-medium uppercase tracking-wider">
+                          Mostrar no Header
+                        </span>
+                      </label>
+                      {paginaFormData.mostrarNoHeader && (
+                        <div className="pl-8">
+                          <label className="block text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Ordem (Header)</label>
+                          <input
+                            type="number"
+                            value={paginaFormData.ordemHeader}
+                            onChange={(e) => setPaginaFormData({ ...paginaFormData, ordemHeader: parseInt(e.target.value) || 0 })}
+                            className="w-full bg-zinc-900 border border-zinc-800 text-white p-2 font-mono text-xs focus:border-white focus:outline-none"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="flex items-center gap-3 cursor-pointer group mb-2">
+                        <div className={`w-5 h-5 flex items-center justify-center border transition-colors ${paginaFormData.mostrarNoFooter ? 'bg-white border-white' : 'bg-black border-zinc-700 group-hover:border-zinc-500'}`}>
+                          {paginaFormData.mostrarNoFooter && <Check className="w-3.5 h-3.5 text-black" />}
+                        </div>
+                        <span className="text-sm text-zinc-300 select-none font-medium uppercase tracking-wider">
+                          Mostrar no Footer
+                        </span>
+                      </label>
+                      {paginaFormData.mostrarNoFooter && (
+                        <div className="pl-8">
+                          <label className="block text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Ordem (Footer)</label>
+                          <input
+                            type="number"
+                            value={paginaFormData.ordemFooter}
+                            onChange={(e) => setPaginaFormData({ ...paginaFormData, ordemFooter: parseInt(e.target.value) || 0 })}
+                            className="w-full bg-zinc-900 border border-zinc-800 text-white p-2 font-mono text-xs focus:border-white focus:outline-none"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-zinc-950 border border-zinc-850 p-5 space-y-4">
+                  <h3 className="font-mono text-xs uppercase tracking-[0.2em] text-white border-b border-zinc-900 pb-2">Resumo (Opcional)</h3>
+                  <textarea
+                    value={paginaFormData.resumo}
+                    onChange={(e) => setPaginaFormData({ ...paginaFormData, resumo: e.target.value })}
+                    className="w-full bg-black border border-zinc-800 text-white p-3 font-serif text-sm focus:border-white focus:outline-none transition-colors min-h-[100px] resize-y"
+                    placeholder="Subtítulo ou introdução curta..."
+                  />
+                </div>
+
+                <div className="bg-zinc-950 border border-zinc-850 p-5 space-y-4">
+                  <h3 className="font-mono text-xs uppercase tracking-[0.2em] text-white border-b border-zinc-900 pb-2">Imagem de Cabeçalho</h3>
+                  <ImageUploadManager
+                    label="Imagem Principal da Página"
+                    value={paginaFormData.imagemPrincipal}
+                    onChange={(url) => setPaginaFormData({ ...paginaFormData, imagemPrincipal: url })}
+                    helperText="Opcional. Imagem que aparecerá no cabeçalho da página."
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==========================================================
             VIEW: CATEGORIAS
            ========================================================== */}
         {activeView === 'categorias' && (
@@ -1487,7 +1919,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
 
       </main>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal for Critica */}
       <ModalConfirm
         isOpen={deleteModalOpen}
         title="Excluir Crítica"
@@ -1498,6 +1930,20 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         onCancel={() => {
           setDeleteModalOpen(false);
           setCriticaToDelete(null);
+        }}
+      />
+
+      {/* Delete Confirmation Modal for Pagina */}
+      <ModalConfirm
+        isOpen={deletePaginaModalOpen}
+        title="Excluir Página"
+        message={`Tem certeza que deseja excluir permanentemente a página "${paginaToDelete?.titulo}"? Esta ação removerá a página do banco de dados e do portal público.`}
+        confirmText="Sim, Excluir Página"
+        cancelText="Cancelar"
+        onConfirm={handleConfirmDeletePagina}
+        onCancel={() => {
+          setDeletePaginaModalOpen(false);
+          setPaginaToDelete(null);
         }}
       />
 

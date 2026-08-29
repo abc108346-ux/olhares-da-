@@ -4,19 +4,21 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Critica, UserProfile } from './types';
+import { Critica, UserProfile, Pagina } from './types';
 import { 
   fetchAllCriticas, 
+  fetchAllPaginas,
   subscribeToAuth, 
   seedDatabaseIfEmpty, 
-  getLocalCriticas 
+  getLocalCriticas,
+  getLocalPaginas
 } from './services/firebase';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomePage } from './pages/HomePage';
 import { CriticasPage } from './pages/CriticasPage';
 import { CriticaDetailPage } from './pages/CriticaDetailPage';
-import { SobrePage } from './pages/SobrePage';
+import { PaginaDetailPage } from './pages/PaginaDetailPage';
 import { PesquisaPage } from './pages/PesquisaPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
@@ -26,6 +28,7 @@ export default function App() {
     return window.location.pathname || '/';
   });
   const [criticas, setCriticas] = useState<Critica[]>(() => getLocalCriticas());
+  const [paginas, setPaginas] = useState<Pagina[]>(() => getLocalPaginas());
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -75,6 +78,11 @@ export default function App() {
           setCriticas(items);
         }
 
+        const paginasData = await fetchAllPaginas(false);
+        if (isMounted && paginasData) {
+          setPaginas(paginasData);
+        }
+
         // 3. Trigger initial seeding if first time
         seedDatabaseIfEmpty().catch(() => {});
       } catch (err) {
@@ -122,7 +130,9 @@ export default function App() {
         <AdminDashboardPage
           currentUser={currentUser}
           criticas={criticas}
+          paginas={paginas}
           onCriticasChange={(updated) => setCriticas(updated)}
+          onPaginasChange={(updated) => setPaginas(updated)}
           onNavigate={navigateTo}
           onSelectCritica={(slug) => navigateTo(`/criticas/${slug}`)}
         />
@@ -156,15 +166,16 @@ export default function App() {
       // Not found fallback
       return (
         <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center space-y-4 bg-black text-white">
-          <h2 className="font-serif text-3xl font-bold uppercase">Crítica não encontrada</h2>
-          <p className="text-zinc-400 text-sm max-w-md">
-            O artigo ou crítica procurada pode ter sido movida ou não está mais disponível.
+          <h2 className="font-serif text-3xl font-bold uppercase text-white mb-2">404</h2>
+          <h3 className="font-serif text-2xl font-bold uppercase text-zinc-300">Crítica não encontrada</h3>
+          <p className="text-zinc-400 text-sm max-w-md mt-4">
+            Esta crítica não existe, foi removida ou não está disponível.
           </p>
           <button
             onClick={() => navigateTo('/criticas')}
-            className="px-6 py-3 bg-white text-black font-semibold uppercase text-xs hover:bg-zinc-200 cursor-pointer"
+            className="mt-8 px-6 py-3 bg-white text-black font-bold uppercase text-xs tracking-widest hover:bg-zinc-200 transition-colors"
           >
-            Ver Todas as Críticas
+            VOLTAR PARA CRÍTICAS
           </button>
         </div>
       );
@@ -180,11 +191,6 @@ export default function App() {
       );
     }
 
-    // Sobre Page
-    if (cleanPath === '/sobre') {
-      return <SobrePage onNavigate={navigateTo} />;
-    }
-
     // Pesquisa Page
     if (cleanPath === '/pesquisa') {
       return (
@@ -196,13 +202,39 @@ export default function App() {
       );
     }
 
-    // Default: Home Page
+    if (cleanPath === '/') {
+      return (
+        <HomePage
+          criticas={criticas}
+          onNavigate={navigateTo}
+          onSelectCritica={(slug) => navigateTo(`/criticas/${slug}`)}
+        />
+      );
+    }
+
+    // Dynamic Pages Fallback
+    const pageSlug = cleanPath.replace(/^\//, '');
+    const selectedPagina = paginas.find(p => p.slug === pageSlug);
+
+    if (selectedPagina && selectedPagina.publicada) {
+      return <PaginaDetailPage pagina={selectedPagina} />;
+    }
+
+    // 404 Route for anything else
     return (
-      <HomePage
-        criticas={criticas}
-        onNavigate={navigateTo}
-        onSelectCritica={(slug) => navigateTo(`/criticas/${slug}`)}
-      />
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center space-y-4 bg-black text-white">
+        <h2 className="font-serif text-3xl font-bold uppercase text-white mb-2">404</h2>
+        <h3 className="font-serif text-2xl font-bold uppercase text-zinc-300">Página não encontrada</h3>
+        <p className="text-zinc-400 text-sm max-w-md mt-4">
+          Esta página não existe, foi removida ou não está disponível.
+        </p>
+        <button
+          onClick={() => navigateTo('/')}
+          className="mt-8 px-6 py-3 bg-white text-black font-bold uppercase text-xs tracking-widest hover:bg-zinc-200 transition-colors"
+        >
+          VOLTAR PARA O INÍCIO
+        </button>
+      </div>
     );
   };
 
@@ -216,6 +248,7 @@ export default function App() {
           currentPath={currentPath}
           onNavigate={navigateTo}
           currentUser={currentUser}
+          paginas={paginas}
         />
       )}
 
@@ -226,7 +259,10 @@ export default function App() {
 
       {/* Show footer on public pages */}
       {!isAdminView && (
-        <Footer onNavigate={navigateTo} />
+        <Footer 
+          onNavigate={navigateTo} 
+          paginas={paginas}
+        />
       )}
     </div>
   );

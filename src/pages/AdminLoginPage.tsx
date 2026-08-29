@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { loginWithEmail } from '../services/firebase';
 import { UserProfile } from '../types';
 import { Logo } from '../components/Logo';
-import { Shield, Lock, Mail, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Shield, Lock, Mail, ArrowLeft, AlertCircle, Check } from 'lucide-react';
 
 interface AdminLoginPageProps {
   onLoginSuccess: (user: UserProfile) => void;
@@ -12,6 +12,7 @@ interface AdminLoginPageProps {
 export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess, onNavigate }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +27,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess, 
 
     try {
       setLoading(true);
-      const user = await loginWithEmail(email.trim(), password);
+      const user = await loginWithEmail(email.trim(), password, rememberMe);
       onLoginSuccess(user);
     } catch (err: any) {
       console.error('Auth error:', err);
@@ -131,6 +132,21 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess, 
               />
             </div>
           </div>
+
+          <label className="flex items-center gap-3 cursor-pointer group mb-4">
+            <div className={`w-4 h-4 flex items-center justify-center border transition-colors ${rememberMe ? 'bg-white border-white' : 'bg-black border-zinc-700 group-hover:border-zinc-500'}`}>
+              {rememberMe && <Check className="w-3 h-3 text-black" />}
+            </div>
+            <input 
+              type="checkbox" 
+              className="hidden" 
+              checked={rememberMe} 
+              onChange={(e) => setRememberMe(e.target.checked)} 
+            />
+            <span className="text-xs text-zinc-400 select-none font-medium uppercase tracking-widest font-mono">
+              Lembrar de mim
+            </span>
+          </label>
 
           <button
             type="submit"

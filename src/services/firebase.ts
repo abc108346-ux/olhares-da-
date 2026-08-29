@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
-  getFirestore, 
+  initializeFirestore, 
   collection, 
   doc, 
   getDocs, 
@@ -21,14 +21,20 @@ import {
   GoogleAuthProvider, 
   signOut, 
   onAuthStateChanged as onFirebaseAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
   User 
 } from 'firebase/auth';
-import { Critica, UserProfile } from '../types';
+import { Critica, UserProfile, Pagina } from '../types';
 import { INITIAL_CRITICAS } from '../data/initialCriticas';
+
+// ... (Rest of imports remain)
 import firebaseConfigJson from '../../firebase-applet-config.json';
 
-// Local storage backup key
+// Local storage backup keys
 const STORAGE_KEY = 'olhares_da_cena_criticas_v2';
+const PAGINAS_STORAGE_KEY = 'olhares_da_cena_paginas';
 const ADMIN_SESSION_KEY = 'olhares_da_cena_admin_session';
 
 const viteEnv = (import.meta as any).env || {};
@@ -49,9 +55,9 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize Firestore
 const databaseId = viteEnv.VITE_FIREBASE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId;
-export const db = databaseId && databaseId !== '(default)'
-  ? getFirestore(app, databaseId)
-  : getFirestore(app);
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, databaseId && databaseId !== '(default)' ? databaseId : undefined);
 
 // Initialize Auth
 export const auth = getAuth(app);
@@ -215,6 +221,99 @@ export const seedDatabaseIfEmpty = async (): Promise<void> => {
   }
 };
 
+// ==========================================
+// PAGINAS
+// ==========================================
+
+export const getLocalPaginas = (): Pagina[] => {
+  try {
+    const cached = localStorage.getItem(PAGINAS_STORAGE_KEY);
+    if (cached !== null) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not read paginas from localStorage:', e);
+  }
+  return [];
+};
+
+export const setLocalPaginas = (items: Pagina[]) => {
+  try {
+    localStorage.setItem(PAGINAS_STORAGE_KEY, JSON.stringify(items));
+  } catch (e) {
+    console.warn('Could not write paginas to localStorage:', e);
+  }
+};
+
+export const fetchAllPaginas = async (onlyPublished = true): Promise<Pagina[]> => {
+  try {
+    const paginasRef = collection(db, 'paginas');
+    const snapshot = await getDocs(paginasRef);
+    
+    if (!snapshot.empty) {
+      const items: Pagina[] = [];
+      snapshot.forEach((d) => {
+        items.push({ ...d.data(), id: d.id } as Pagina);
+      });
+      setLocalPaginas(items);
+      
+      if (onlyPublished) {
+        return items.filter(p => p.publicada);
+      }
+      return items;
+    }
+  } catch (err) {
+    console.warn('Firestore fetch paginas error, fallback local:', err);
+  }
+  
+  const local = getLocalPaginas();
+  if (onlyPublished) {
+    return local.filter(p => p.publicada);
+  }
+  return local;
+};
+
+export const savePaginaToDb = async (pagina: Pagina): Promise<Pagina> => {
+  const finalPagina = {
+    ...pagina,
+    dataAtualizacao: new Date().toISOString(),
+  };
+
+  const local = getLocalPaginas();
+  const index = local.findIndex(p => p.id === finalPagina.id);
+  if (index >= 0) {
+    local[index] = finalPagina;
+  } else {
+    local.push(finalPagina);
+  }
+  setLocalPaginas(local);
+
+  try {
+    const docRef = doc(db, 'paginas', finalPagina.id);
+    await setDoc(docRef, finalPagina, { merge: true });
+  } catch (err) {
+    console.warn('Could not save pagina to Firestore:', err);
+  }
+  return finalPagina;
+};
+
+export const deletePaginaFromDb = async (id: string): Promise<boolean> => {
+  const local = getLocalPaginas().filter(p => p.id !== id);
+  setLocalPaginas(local);
+
+  try {
+    const docRef = doc(db, 'paginas', id);
+    await deleteDoc(docRef);
+    return true;
+  } catch (err) {
+    console.warn('Could not delete pagina from Firestore:', err);
+    return true;
+  }
+};
+
 /**
  * Admin Authentication Helpers
  * Uses strictly Firebase Authentication (email/password or Google Sign-In) configured by the user in Firebase Console.
@@ -238,7 +337,8 @@ export const subscribeToAuth = (callback: (user: UserProfile | null) => void) =>
   });
 };
 
-export const loginWithEmail = async (email: string, pass: string): Promise<UserProfile> => {
+export const loginWithEmail = async (email: string, pass: string, rememberMe: boolean = false): Promise<UserProfile> => {
+  await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
   const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
   const userProfile: UserProfile = {
     uid: cred.user.uid,

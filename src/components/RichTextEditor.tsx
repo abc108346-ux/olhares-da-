@@ -211,7 +211,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           {(activeTab === 'write' || activeTab === 'split') && (
             <textarea
               id="rich-editor-textarea"
-              value={value}
+              value={value || ''}
               onChange={(e) => onChange(e.target.value)}
               placeholder="Escreva a crítica teatral aqui... Você pode adicionar títulos com '##', citações com '>', e inserir imagens com o botão da barra superior."
               style={{ minHeight }}

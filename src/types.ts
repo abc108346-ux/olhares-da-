@@ -58,6 +58,23 @@ export interface UserProfile {
   isAdmin?: boolean;
 }
 
+export interface Pagina {
+  id: string;
+  titulo: string;
+  slug: string;
+  resumo: string;
+  conteudo: string;
+  imagemPrincipal?: string;
+  publicada: boolean;
+  dataCriacao: string;
+  dataAtualizacao: string;
+  dataPublicacao?: string;
+  mostrarNoHeader: boolean;
+  ordemHeader?: number;
+  mostrarNoFooter: boolean;
+  ordemFooter?: number;
+}
+
 export interface SearchFilterState {
   termo: string;
   categoria: string;
