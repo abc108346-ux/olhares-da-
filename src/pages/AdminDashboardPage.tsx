@@ -47,8 +47,10 @@ import {
   X,
   Loader2,
   CheckCheck,
-  FileCode2
-, Compass } from 'lucide-react';
+  FileCode2,
+  Compass,
+  ArrowUpRight
+} from 'lucide-react';
 
 interface AdminDashboardPageProps {
   currentUser: UserProfile;
@@ -2082,6 +2084,30 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         )}
 
       </main>
+
+      {/* Admin Bottom Footer Credit Bar */}
+      <footer id="admin-footer" className="border-t border-zinc-900 bg-black/90 py-6 px-4 sm:px-8 text-xs text-zinc-400">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <span>© {new Date().getFullYear()} Olhares da Cena — Painel Administrativo</span>
+            <span className="hidden sm:inline text-zinc-700">•</span>
+            <a
+              id="admin-footer-author-credit"
+              href="https://bwwebdesign.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center sm:justify-start gap-1.5 text-zinc-400 hover:text-white transition-all group"
+            >
+              <span>Produzido por</span>
+              <span className="font-semibold text-amber-400 hover:text-amber-300 transition-colors underline decoration-amber-400/50 hover:decoration-amber-300 underline-offset-4 tracking-wide">
+                BW Bernardo Web Design
+              </span>
+              <ArrowUpRight className="w-3.5 h-3.5 text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </a>
+          </div>
+          <span className="text-[11px] text-zinc-400 font-mono">v2.5 • Produção Editorial</span>
+        </div>
+      </footer>
 
       {/* Delete Confirmation Modal for Critica */}
       <ModalConfirm

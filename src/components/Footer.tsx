@@ -119,9 +119,23 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, paginas = [] }) => {
         </div>
 
         {/* Bottom copyright row */}
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
-          <div>
+        <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-center sm:text-left">
             <span>© {new Date().getFullYear()} Olhares da Cena. Todos os direitos reservados.</span>
+            <span className="hidden sm:inline text-zinc-700">•</span>
+            <a
+              id="footer-author-credit"
+              href="https://bwwebdesign.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center sm:justify-start gap-1.5 text-zinc-400 hover:text-white transition-all group"
+            >
+              <span className="text-zinc-400">Produzido por</span>
+              <span className="font-semibold text-amber-400 hover:text-amber-300 transition-colors underline decoration-amber-400/50 hover:decoration-amber-300 underline-offset-4 tracking-wide">
+                BW Bernardo Web Design
+              </span>
+              <ArrowUpRight className="w-3.5 h-3.5 text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </a>
           </div>
 
           <div className="flex items-center space-x-6">
