@@ -9,6 +9,9 @@ import {
   fetchAllCriticas, 
   fetchAllPaginas,
   subscribeToAuth, 
+  subscribeToCriticas,
+  subscribeToPaginas,
+  syncLocalDataToFirestore,
   seedDatabaseIfEmpty, 
   getLocalCriticas,
   getLocalPaginas
@@ -63,41 +66,37 @@ export default function App() {
   useEffect(() => {
     let isMounted = true;
 
-    const initialize = async () => {
-      try {
-        // 1. Subscribe to Firebase auth
-        subscribeToAuth((user) => {
-          if (isMounted) {
-            setCurrentUser(user);
-          }
-        });
-
-        // 2. Fetch critiques from Firebase (or cache)
-        const items = await fetchAllCriticas(false);
-        if (isMounted && items && items.length > 0) {
-          setCriticas(items);
-        }
-
-        const paginasData = await fetchAllPaginas(false);
-        if (isMounted && paginasData) {
-          setPaginas(paginasData);
-        }
-
-        // 3. Trigger initial seeding if first time
-        seedDatabaseIfEmpty().catch(() => {});
-      } catch (err) {
-        console.warn('Init error:', err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+    // 1. Subscribe to Firebase auth
+    const unsubAuth = subscribeToAuth((user) => {
+      if (isMounted) {
+        setCurrentUser(user);
       }
-    };
+    });
 
-    initialize();
+    // 2. Real-time subscription to Critiques across all devices
+    const unsubCriticas = subscribeToCriticas((items) => {
+      if (isMounted && items) {
+        setCriticas(items);
+        setLoading(false);
+      }
+    });
+
+    // 3. Real-time subscription to Pages
+    const unsubPaginas = subscribeToPaginas((paginasData) => {
+      if (isMounted && paginasData) {
+        setPaginas(paginasData);
+      }
+    });
+
+    // 4. Initial sync & seeding
+    syncLocalDataToFirestore().catch(() => {});
+    seedDatabaseIfEmpty().catch(() => {});
 
     return () => {
       isMounted = false;
+      if (unsubAuth) unsubAuth();
+      if (unsubCriticas) unsubCriticas();
+      if (unsubPaginas) unsubPaginas();
     };
   }, []);
 

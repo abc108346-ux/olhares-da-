@@ -75,6 +75,12 @@ export interface Pagina {
   ordemFooter?: number;
 }
 
+export interface HomeSettings {
+  heroImageUrl: string;
+  manifestoText: string;
+  manifestoCaption: string;
+}
+
 export interface SearchFilterState {
   termo: string;
   categoria: string;

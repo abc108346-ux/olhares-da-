@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Pagina } from '../types';
-import Markdown from 'react-markdown';
+import { RichContentRenderer } from '../components/RichContentRenderer';
 
 interface PaginaDetailPageProps {
   pagina: Pagina;
@@ -42,21 +42,7 @@ export const PaginaDetailPage: React.FC<PaginaDetailPageProps> = ({ pagina }) =>
         )}
 
         <div className="font-serif text-lg sm:text-xl leading-relaxed text-zinc-300 space-y-6">
-          <Markdown
-            components={{
-              p: ({ node, ...props }) => <p className="mb-6 leading-relaxed" {...props} />,
-              h1: ({ node, ...props }) => <h1 className="text-3xl font-bold uppercase text-white mt-12 mb-6" {...props} />,
-              h2: ({ node, ...props }) => <h2 className="text-2xl font-bold uppercase text-white mt-10 mb-5" {...props} />,
-              h3: ({ node, ...props }) => <h3 className="text-xl font-bold uppercase text-white mt-8 mb-4" {...props} />,
-              ul: ({ node, ...props }) => <ul className="list-disc pl-6 mb-6 space-y-2" {...props} />,
-              ol: ({ node, ...props }) => <ol className="list-decimal pl-6 mb-6 space-y-2" {...props} />,
-              a: ({ node, ...props }) => <a className="text-white underline underline-offset-4 decoration-zinc-600 hover:decoration-white transition-colors" {...props} />,
-              blockquote: ({ node, ...props }) => <blockquote className="border-l-2 border-white pl-6 italic text-zinc-400 my-8" {...props} />,
-              strong: ({ node, ...props }) => <strong className="font-bold text-white" {...props} />,
-            }}
-          >
-            {pagina.conteudo}
-          </Markdown>
+          <RichContentRenderer content={pagina.conteudo} />
         </div>
       </main>
     </div>

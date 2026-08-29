@@ -6,35 +6,40 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Critiques collection
+    // Critiques collection - public read for all visitors on mobile and desktop
     match /criticas/{criticaId} {
-      // Anyone can read published critiques or if admin is signed in they can read all (including drafts)
-      allow read: if resource == null || resource.data.publicada == true || isAuthenticated();
-      // Only authenticated admins can create, update or delete
-      allow create, update, delete: if isAuthenticated();
-    }
-
-    // Pages collection
-    match /paginas/{paginaId} {
-      allow read: if resource == null || resource.data.publicada == true || isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
-    }
-
-    // Categories collection
-    match /categorias/{categoriaId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if true;
+    }
+
+    // Pages collection - public read
+    match /paginas/{paginaId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Settings (e.g. home settings, banner, manifesto)
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if true;
     }
 
     // System configurations and media metadata
     match /configuracoes/{configId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if true;
     }
 
-    // Default deny for anything else
+    // Categories collection
+    match /categorias/{categoriaId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Fallback default
     match /{document=**} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
   }
 }
+

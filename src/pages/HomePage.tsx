@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight, Sparkles, BookOpen, Compass, Search } from 'lucide-react';
-import { Critica } from '../types';
+import { Critica, HomeSettings } from '../types';
 import { Logo } from '../components/Logo';
 import { CriticaCard } from '../components/CriticaCard';
 import { SearchBar } from '../components/SearchBar';
+import { getHomeSettings } from '../services/firebase';
 
 interface HomePageProps {
   criticas: Critica[];
@@ -13,9 +14,22 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSelectCritica }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const [homeSettings, setHomeSettings] = useState<HomeSettings>({
+    heroImageUrl: "https://blogger.googleusercontent.com/img/a/AVvXsEhElA3KqcSpB1S-r4XP-FkCjJEjxjOLu0stZo9jyNzaKsom_FKQtibjmxUTU-WyYpJvyCAqWk-gCSF9-TC0X8AihtdD8nz6UTpM_PLcqEY1wUGxVm4RPqqASBiIgM-RuB5dtoYwf4BlLAoMa0zEFDUiL2wLcODiESPk7Y6RltvXOR7579sZqUb_t4gtcn2O=s910",
+    manifestoText: "A crítica de teatro não é um tribunal de julgamentos sumários, mas o prolongamento da experiência sensível do palco através da escrita e do debate rigoroso.",
+    manifestoCaption: "Olhares da Cena • Arquivo Crítico"
+  });
 
-  // Official Hero Image provided in user prompt
-  const HERO_IMAGE_URL = "https://blogger.googleusercontent.com/img/a/AVvXsEhElA3KqcSpB1S-r4XP-FkCjJEjxjOLu0stZo9jyNzaKsom_FKQtibjmxUTU-WyYpJvyCAqWk-gCSF9-TC0X8AihtdD8nz6UTpM_PLcqEY1wUGxVm4RPqqASBiIgM-RuB5dtoYwf4BlLAoMa0zEFDUiL2wLcODiESPk7Y6RltvXOR7579sZqUb_t4gtcn2O=s910";
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const settings = await getHomeSettings();
+      if (settings && settings.heroImageUrl && !settings.heroImageUrl.includes('unsplash.com') && !settings.heroImageUrl.includes('postimg.cc')) {
+        setHomeSettings(settings);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   // Filter published only for public viewing
   const publishedCriticas = criticas.filter(c => c.publicada);
@@ -36,16 +50,17 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
     <div id="home-page" className="min-h-screen bg-black text-white space-y-12 sm:space-y-16 pb-20">
       
       {/* =========================================================================
-          1. HERO SECTION (Only the image in right proportions, no text overlay)
+          1. HERO SECTION (Proper sizing and aspect ratio)
          ========================================================================= */}
-      <section id="hero-section" className="w-full border-b border-zinc-900 bg-black pt-4 pb-8 sm:py-10">
+      <section id="hero-section" className="w-full border-b border-zinc-900 bg-black pt-2 pb-6 sm:py-8">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative border border-zinc-850 bg-zinc-950 overflow-hidden shadow-2xl">
+          <div className="relative border border-zinc-850 bg-black overflow-hidden shadow-2xl flex items-center justify-center">
             <img
-              src={HERO_IMAGE_URL}
+              src={homeSettings.heroImageUrl}
               alt="Olhares da Cena"
               fetchPriority="high"
-              className="w-full max-h-[300px] sm:max-h-[380px] md:max-h-[420px] object-cover object-center grayscale contrast-125 brightness-95"
+              referrerPolicy="no-referrer"
+              className="w-full h-auto max-h-[500px] object-contain block mx-auto"
             />
           </div>
         </div>
@@ -194,13 +209,13 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
             <div className="w-2 h-2 bg-white" />
           </div>
 
-          <blockquote className="font-serif italic text-xl sm:text-2xl lg:text-3xl text-zinc-200 leading-relaxed font-light">
-            “A crítica de teatro não é um tribunal de julgamentos sumários, mas o prolongamento da experiência sensível do palco através da escrita e do debate rigoroso.”
+          <blockquote className="font-serif italic text-xl sm:text-2xl lg:text-3xl text-zinc-200 leading-relaxed font-light whitespace-pre-wrap">
+            “{homeSettings.manifestoText}”
           </blockquote>
 
           <div className="pt-2">
             <p className="text-xs uppercase tracking-[0.25em] text-zinc-500 font-mono">
-              Olhares da Cena • Arquivo Crítico Teatral
+              {homeSettings.manifestoCaption}
             </p>
           </div>
         </div>

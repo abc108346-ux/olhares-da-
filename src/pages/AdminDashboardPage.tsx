@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Critica, 
   UserProfile, 
@@ -12,7 +12,9 @@ import {
   savePaginaToDb,
   deletePaginaFromDb,
   seedDatabaseIfEmpty, 
-  logoutAdminUser 
+  logoutAdminUser,
+  getHomeSettings,
+  saveHomeSettings
 } from '../services/firebase';
 import { Logo } from '../components/Logo';
 import { RichTextEditor } from '../components/RichTextEditor';
@@ -46,7 +48,7 @@ import {
   Loader2,
   CheckCheck,
   FileCode2
-} from 'lucide-react';
+, Compass } from 'lucide-react';
 
 interface AdminDashboardPageProps {
   currentUser: UserProfile;
@@ -58,7 +60,7 @@ interface AdminDashboardPageProps {
   onSelectCritica: (slug: string) => void;
 }
 
-type AdminView = 'dashboard' | 'criticas' | 'nova-critica' | 'editar-critica' | 'paginas' | 'nova-pagina' | 'editar-pagina' | 'categorias' | 'midia' | 'configuracoes';
+type AdminView = 'dashboard' | 'criticas' | 'nova-critica' | 'editar-critica' | 'paginas' | 'nova-pagina' | 'editar-pagina' | 'categorias' | 'midia' | 'configuracoes' | 'home-settings';
 
 const CATEGORIAS_PADRAO: CategoriaTipo[] = [
   'Teatro',
@@ -184,6 +186,39 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       temporada: '',
     }
   });
+
+  const [homeSettingsFormData, setHomeSettingsFormData] = useState({
+    heroImageUrl: 'https://blogger.googleusercontent.com/img/a/AVvXsEhElA3KqcSpB1S-r4XP-FkCjJEjxjOLu0stZo9jyNzaKsom_FKQtibjmxUTU-WyYpJvyCAqWk-gCSF9-TC0X8AihtdD8nz6UTpM_PLcqEY1wUGxVm4RPqqASBiIgM-RuB5dtoYwf4BlLAoMa0zEFDUiL2wLcODiESPk7Y6RltvXOR7579sZqUb_t4gtcn2O=s910',
+    manifestoText: 'A crítica de teatro não é um tribunal de julgamentos sumários, mas o prolongamento da experiência sensível do palco através da escrita e do debate rigoroso.',
+    manifestoCaption: 'Olhares da Cena • Arquivo Crítico Teatral'
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const settings = await getHomeSettings();
+      if (settings && settings.heroImageUrl && !settings.heroImageUrl.includes('unsplash.com') && !settings.heroImageUrl.includes('postimg.cc')) {
+        setHomeSettingsFormData(settings);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const handleSaveHomeSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setSaveSuccessMessage(null);
+    try {
+      await saveHomeSettings(homeSettingsFormData);
+      setSaveSuccessMessage('Página inicial atualizada com sucesso!');
+      setTimeout(() => setSaveSuccessMessage(null), 3000);
+      showNotification('Página inicial atualizada', 'success');
+    } catch (err) {
+      console.error(err);
+      showNotification('Erro ao atualizar a página', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ message, type });
@@ -674,6 +709,17 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
             >
               <ImageIcon className="w-4 h-4" />
               <span>MÍDIA / IMAGENS</span>
+            </button>
+
+            <button
+              id="admin-nav-home-settings"
+              onClick={() => { setActiveView('home-settings'); setMobileSidebarOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors cursor-pointer ${
+                activeView === 'home-settings' ? 'bg-white text-black font-bold' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+              }`}
+            >
+              <Compass className="w-4 h-4" />
+              <span>PÁGINA INICIAL</span>
             </button>
 
             <button
@@ -1258,7 +1304,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 <RichTextEditor
                   value={formData.conteudo}
                   onChange={(val) => setFormData(prev => ({ ...prev, conteudo: val }))}
-                  minHeight="400px"
+                  minHeight="450px"
+                  draftKey={`olhares_draft_critica_${editingCriticaId || 'new'}`}
+                  label="3. TEXTO COMPLETO DA CRÍTICA (EDITOR RICO)"
+                  helperText="Barra de formatação completa: fontes, tamanhos, títulos, negrito, itálico, cores, imagens, vídeos do YouTube, tabelas e modo HTML (<>)."
                 />
               </div>
 
@@ -1678,11 +1727,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-mono text-zinc-400 uppercase tracking-widest mb-1.5">Conteúdo Principal (Markdown) *</label>
                   <RichTextEditor
                     value={paginaFormData.conteudo}
                     onChange={(val) => setPaginaFormData({ ...paginaFormData, conteudo: val })}
                     minHeight="500px"
+                    draftKey={`olhares_draft_pagina_${editingPaginaId || 'new'}`}
+                    label="CONTEÚDO PRINCIPAL DA PÁGINA INSTITUCIONAL"
+                    helperText="Editor de texto completo com barra de formatação estilo Blogger."
                   />
                 </div>
               </div>
@@ -1861,6 +1912,101 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
               ))}
             </div>
           </div>
+        )}
+
+        {/* ==========================================================
+            VIEW: HOME SETTINGS
+           ========================================================== */}
+        {activeView === 'home-settings' && (
+          <form onSubmit={handleSaveHomeSettings} className="space-y-8 max-w-5xl animate-in fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-850 pb-6">
+              <div>
+                <h1 className="font-serif text-3xl font-bold uppercase text-white tracking-tight">
+                  Página Inicial
+                </h1>
+                <p className="text-xs font-mono text-zinc-400 mt-1">
+                  Personalize o banner principal e o manifesto editorial do portal.
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                {saveSuccessMessage && (
+                  <span className="text-xs font-mono text-emerald-400 flex items-center gap-1.5 animate-in fade-in">
+                    <CheckCircle className="w-4 h-4" /> {saveSuccessMessage}
+                  </span>
+                )}
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-6 py-2.5 bg-white text-black font-bold uppercase tracking-widest text-xs hover:bg-zinc-200 transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSaving ? 'SALVANDO...' : 'SALVAR ALTERAÇÕES'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="bg-zinc-950 border border-zinc-850 p-6 space-y-6">
+                  <h3 className="font-mono text-xs uppercase tracking-[0.2em] text-white border-b border-zinc-900 pb-3">
+                    Manifesto Editorial
+                  </h3>
+                  
+                  <div>
+                    <label className="block text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-2">
+                      Texto do Manifesto (Citação)
+                    </label>
+                    <textarea
+                      required
+                      value={homeSettingsFormData.manifestoText}
+                      onChange={(e) => setHomeSettingsFormData(prev => ({ ...prev, manifestoText: e.target.value }))}
+                      placeholder="Ex: A crítica de teatro não é um tribunal..."
+                      className="w-full h-32 bg-zinc-900 border border-zinc-800 text-white p-4 font-serif text-lg focus:border-white focus:outline-none resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-2">
+                      Assinatura / Legenda
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={homeSettingsFormData.manifestoCaption}
+                      onChange={(e) => setHomeSettingsFormData(prev => ({ ...prev, manifestoCaption: e.target.value }))}
+                      placeholder="Ex: Olhares da Cena • Arquivo Crítico"
+                      className="w-full bg-zinc-900 border border-zinc-800 text-white p-3 font-mono text-xs focus:border-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-zinc-950 border border-zinc-850 p-6 space-y-6">
+                  <h3 className="font-mono text-xs uppercase tracking-[0.2em] text-white border-b border-zinc-900 pb-3">
+                    Imagem de Destaque (Banner)
+                  </h3>
+                  <div className="space-y-4">
+                    {homeSettingsFormData.heroImageUrl && (
+                      <div className="relative bg-black border border-zinc-800 overflow-hidden group flex items-center justify-center p-2">
+                        <img 
+                          src={homeSettingsFormData.heroImageUrl} 
+                          alt="Banner Preview" 
+                          className="w-full h-auto max-h-48 object-contain"
+                        />
+                      </div>
+                    )}
+                    <ImageUploadManager
+                      label="Banner da Página Inicial"
+                      value={homeSettingsFormData.heroImageUrl}
+                      onChange={(url) => setHomeSettingsFormData(prev => ({ ...prev, heroImageUrl: url }))}
+                      helperText="Escolha a imagem que será exibida no topo da página inicial."
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
         )}
 
         {/* ==========================================================

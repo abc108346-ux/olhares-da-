@@ -63,11 +63,11 @@ export const CriticaDetailPage: React.FC<CriticaDetailPageProps> = ({
       </div>
 
       {/* Main Article Header */}
-      <header className="max-w-4xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-8 space-y-6">
+      <header className="max-w-4xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-8 space-y-6 text-center">
         
-        {/* Category Pill */}
-        <div className="flex items-center gap-3">
-          <span className="inline-block px-3 py-1 bg-white text-black text-xs uppercase font-bold tracking-[0.25em]">
+        {/* Category Pill & Destaque Centered */}
+        <div className="flex items-center justify-center gap-3">
+          <span className="inline-block px-3.5 py-1 bg-white text-black text-xs uppercase font-bold tracking-[0.25em]">
             {critica.categoria}
           </span>
           {critica.destaque && (
@@ -77,13 +77,13 @@ export const CriticaDetailPage: React.FC<CriticaDetailPageProps> = ({
           )}
         </div>
 
-        {/* Big Title */}
-        <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white uppercase leading-[1.1]">
+        {/* Centered Big Title */}
+        <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white uppercase leading-[1.15] text-center max-w-3xl mx-auto break-words">
           {critica.titulo}
         </h1>
 
-        {/* Metadata bar */}
-        <div className="flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-zinc-400 font-mono border-y border-zinc-900 py-3">
+        {/* Centered Metadata bar */}
+        <div className="flex flex-wrap items-center justify-center gap-y-2.5 gap-x-6 text-xs text-zinc-400 font-mono border-y border-zinc-900 py-3.5 max-w-2xl mx-auto">
           <div className="flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5 text-zinc-500" />
             <span>Publicado em {formattedDate}</span>
@@ -102,19 +102,21 @@ export const CriticaDetailPage: React.FC<CriticaDetailPageProps> = ({
           )}
         </div>
 
-        {/* Lead Summary Excerpt */}
+        {/* Centered Lead Summary Excerpt */}
         {critica.resumo && (
-          <p className="font-serif italic text-lg sm:text-2xl text-zinc-200 leading-relaxed font-light pl-4 border-l-2 border-zinc-600 my-6">
-            {critica.resumo}
-          </p>
+          <div className="max-w-2xl mx-auto pt-2 pb-1">
+            <p className="font-serif italic text-lg sm:text-xl md:text-2xl text-zinc-200 leading-relaxed font-light text-center py-4 px-4 sm:px-8 border-y border-zinc-800/80 bg-zinc-950/40">
+              "{critica.resumo}"
+            </p>
+          </div>
         )}
 
       </header>
 
       {/* Main Feature Image */}
       {critica.imagemPrincipal && (
-        <figure className="max-w-5xl mx-auto px-4 sm:px-6 mb-12 space-y-2">
-          <div className="overflow-hidden border border-zinc-850 bg-zinc-950">
+        <figure className="max-w-4xl mx-auto px-4 sm:px-6 mb-12 space-y-2.5">
+          <div className="overflow-hidden border border-zinc-850 bg-zinc-950 shadow-2xl">
             <img
               src={critica.imagemPrincipal}
               alt={critica.titulo}
@@ -130,9 +132,9 @@ export const CriticaDetailPage: React.FC<CriticaDetailPageProps> = ({
       )}
 
       {/* Article Body Content */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6">
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 w-full overflow-x-hidden">
         
-        {/* Full Rich Markdown content */}
+        {/* Full Rich Markdown / HTML content */}
         <RichContentRenderer content={critica.conteudo} />
 
         {/* Ficha Técnica */}
@@ -147,7 +149,7 @@ export const CriticaDetailPage: React.FC<CriticaDetailPageProps> = ({
         {/* Additional Images Gallery if any */}
         {critica.imagens && critica.imagens.length > 0 && (
           <div className="my-12 space-y-4">
-            <h4 className="text-xs uppercase font-mono tracking-[0.25em] text-zinc-400 border-b border-zinc-900 pb-2">
+            <h4 className="text-xs uppercase font-mono tracking-[0.25em] text-zinc-400 border-b border-zinc-900 pb-2 text-center sm:text-left">
               GALERIA DE CENA
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -167,7 +169,7 @@ export const CriticaDetailPage: React.FC<CriticaDetailPageProps> = ({
 
         {/* Tags Section */}
         {critica.tags && critica.tags.length > 0 && (
-          <div className="my-8 pt-6 border-t border-zinc-900 flex flex-wrap items-center gap-2">
+          <div className="my-8 pt-6 border-t border-zinc-900 flex flex-wrap items-center justify-center sm:justify-start gap-2">
             <span className="text-xs uppercase font-mono text-zinc-500 mr-2 flex items-center gap-1">
               <Tag className="w-3.5 h-3.5" />
               TAGS:
@@ -186,7 +188,7 @@ export const CriticaDetailPage: React.FC<CriticaDetailPageProps> = ({
 
         {/* Share Bar */}
         <div className="my-8 p-4 bg-zinc-950 border border-zinc-850 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-xs font-serif italic text-zinc-300">
+          <div className="text-xs font-serif italic text-zinc-300 text-center sm:text-left">
             Apreciou esta reflexão sobre a cena? Compartilhe com a comunidade teatral.
           </div>
           <ShareButtons titulo={critica.titulo} />
