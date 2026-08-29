@@ -117,7 +117,7 @@ export const getLocalCriticas = (): Critica[] => {
     const cached = localStorage.getItem(STORAGE_KEY);
     if (cached !== null) {
       const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
@@ -136,60 +136,22 @@ export const setLocalCriticas = (items: Critica[]) => {
 };
 
 /**
- * Syncs any local critiques (e.g. created offline or before rules were deployed) to Firestore
- */
-export const syncLocalDataToFirestore = async (): Promise<void> => {
-  try {
-    const local = getLocalCriticas();
-    if (!local || local.length === 0) return;
-
-    for (const item of local) {
-      if (item && item.id) {
-        const docRef = doc(db, 'criticas', item.id);
-        await setDoc(docRef, item, { merge: true });
-      }
-    }
-
-    const localPaginas = getLocalPaginas();
-    for (const pag of localPaginas) {
-      if (pag && pag.id) {
-        const docRef = doc(db, 'paginas', pag.id);
-        await setDoc(docRef, pag, { merge: true });
-      }
-    }
-  } catch (err) {
-    console.warn('Error during background sync to Firestore:', err);
-  }
-};
-
-/**
  * Real-time listener for critiques collection
  */
 export const subscribeToCriticas = (callback: (criticas: Critica[]) => void) => {
   try {
     const criticasRef = collection(db, 'criticas');
     return onSnapshot(criticasRef, (snapshot) => {
-      if (!snapshot.empty) {
-        const items: Critica[] = [];
-        snapshot.forEach((d) => {
-          items.push({
-            ...(d.data() as Critica),
-            id: d.id,
-          });
+      const items: Critica[] = [];
+      snapshot.forEach((d) => {
+        items.push({
+          ...(d.data() as Critica),
+          id: d.id,
         });
-        items.sort((a, b) => new Date(b.dataPublicacao || '').getTime() - new Date(a.dataPublicacao || '').getTime());
-        setLocalCriticas(items);
-        callback(items);
-      } else {
-        // If Firestore is empty, check if we have local cache or need to seed
-        const local = getLocalCriticas();
-        if (local && local.length > 0) {
-          syncLocalDataToFirestore().catch(() => {});
-          callback(local);
-        } else {
-          callback([]);
-        }
-      }
+      });
+      items.sort((a, b) => new Date(b.dataPublicacao || '').getTime() - new Date(a.dataPublicacao || '').getTime());
+      setLocalCriticas(items);
+      callback(items);
     }, (error) => {
       console.warn('Real-time criticas snapshot error:', error);
       callback(getLocalCriticas());
@@ -257,12 +219,6 @@ export const fetchAllCriticas = async (onlyPublished = true): Promise<Critica[]>
         return items.filter(c => c.publicada);
       }
       return items;
-    } else {
-      // If Firestore is empty, attempt to sync local
-      const local = getLocalCriticas();
-      if (local && local.length > 0) {
-        syncLocalDataToFirestore().catch(() => {});
-      }
     }
   } catch (err) {
     console.warn('Firestore fetch error, falling back to local storage:', err);
@@ -346,15 +302,16 @@ export const deleteCriticaFromDb = async (id: string): Promise<boolean> => {
   try {
     const docRef = doc(db, 'criticas', id);
     await deleteDoc(docRef);
+    console.log(`Document ${id} successfully deleted from Firestore.`);
     return true;
   } catch (err) {
-    console.warn('Could not delete from Firestore (deleted locally):', err);
-    return true;
+    console.error('Could not delete from Firestore:', err);
+    throw err;
   }
 };
 
 /**
- * Seed initial sample dataset to Firestore if it's empty or on demand.
+ * Seed initial sample dataset to Firestore on demand.
  */
 export const seedDatabaseIfEmpty = async (): Promise<void> => {
   try {
@@ -366,7 +323,7 @@ export const seedDatabaseIfEmpty = async (): Promise<void> => {
       }
     }
   } catch (err) {
-    console.warn('Could not auto-seed to Firestore:', err);
+    console.warn('Could not seed to Firestore:', err);
   }
 };
 
@@ -445,6 +402,7 @@ export const savePaginaToDb = async (pagina: Pagina): Promise<Pagina> => {
     await setDoc(docRef, finalPagina, { merge: true });
   } catch (err) {
     console.warn('Could not save pagina to Firestore:', err);
+    throw err;
   }
   return finalPagina;
 };
@@ -456,10 +414,11 @@ export const deletePaginaFromDb = async (id: string): Promise<boolean> => {
   try {
     const docRef = doc(db, 'paginas', id);
     await deleteDoc(docRef);
+    console.log(`Pagina ${id} successfully deleted from Firestore.`);
     return true;
   } catch (err) {
-    console.warn('Could not delete pagina from Firestore:', err);
-    return true;
+    console.error('Could not delete pagina from Firestore:', err);
+    throw err;
   }
 };
 

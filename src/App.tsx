@@ -11,8 +11,6 @@ import {
   subscribeToAuth, 
   subscribeToCriticas,
   subscribeToPaginas,
-  syncLocalDataToFirestore,
-  seedDatabaseIfEmpty, 
   getLocalCriticas,
   getLocalPaginas
 } from './services/firebase';
@@ -87,10 +85,6 @@ export default function App() {
         setPaginas(paginasData);
       }
     });
-
-    // 4. Initial sync & seeding
-    syncLocalDataToFirestore().catch(() => {});
-    seedDatabaseIfEmpty().catch(() => {});
 
     return () => {
       isMounted = false;
