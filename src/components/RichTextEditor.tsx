@@ -192,20 +192,90 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   // Save current DOM selection
   const saveSelection = () => {
     const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
+    if (sel && sel.rangeCount > 0 && editorRef.current) {
+      const range = sel.getRangeAt(0);
+      if (editorRef.current.contains(range.commonAncestorContainer)) {
+        savedSelectionRef.current = range.cloneRange();
+      }
     }
   };
 
+  // Find enclosing block element (p, h1, h2, h3, h4, blockquote, etc.)
+  const getBlockParent = (node: Node | null): HTMLElement | null => {
+    let current = node;
+    while (current && current !== editorRef.current) {
+      if (current.nodeType === Node.ELEMENT_NODE) {
+        const tag = (current as HTMLElement).tagName.toLowerCase();
+        if (['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'li', 'div'].includes(tag)) {
+          return current as HTMLElement;
+        }
+      }
+      current = current.parentNode;
+    }
+    return null;
+  };
+
   // Restore DOM selection
-  const restoreSelection = () => {
-    if (savedSelectionRef.current) {
-      const sel = window.getSelection();
-      if (sel) {
+  const restoreSelection = (): Range | null => {
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    const sel = window.getSelection();
+    if (savedSelectionRef.current && sel) {
+      sel.removeAllRanges();
+      sel.addRange(savedSelectionRef.current);
+      return savedSelectionRef.current;
+    }
+    if (sel && sel.rangeCount > 0) {
+      return sel.getRangeAt(0);
+    }
+    return null;
+  };
+
+  // Select an entire element and maintain active selection range
+  const selectElement = (el: HTMLElement) => {
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      sel.addRange(range);
+      savedSelectionRef.current = range.cloneRange();
+    }
+  };
+
+  // Auto-expand to word if selection is collapsed
+  const expandToWordOrBlockIfCollapsed = (sel: Selection): Range | null => {
+    if (!sel || sel.rangeCount === 0) return null;
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return range;
+
+    const node = range.startContainer;
+    if (node.nodeType === Node.TEXT_NODE && node.textContent) {
+      const text = node.textContent;
+      const offset = range.startOffset;
+      let start = offset;
+      while (start > 0 && /\S/.test(text[start - 1])) {
+        start--;
+      }
+      let end = offset;
+      while (end < text.length && /\S/.test(text[end])) {
+        end++;
+      }
+      if (start < end) {
+        const newRange = document.createRange();
+        newRange.setStart(node, start);
+        newRange.setEnd(node, end);
         sel.removeAllRanges();
-        sel.addRange(savedSelectionRef.current);
+        sel.addRange(newRange);
+        savedSelectionRef.current = newRange.cloneRange();
+        return newRange;
       }
     }
+    return range;
   };
 
   // Close popovers on click outside
@@ -238,6 +308,36 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         insertOrderedList: document.queryCommandState('insertOrderedList'),
       });
       saveSelection();
+
+      // Detect font, size, and style of current selection
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editorRef.current) {
+        const node = sel.anchorNode;
+        if (node && editorRef.current.contains(node)) {
+          const elem = node.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement) : node.parentElement;
+          if (elem) {
+            const block = getBlockParent(elem);
+            if (block) {
+              const tag = block.tagName.toLowerCase();
+              if (block.classList.contains('editorial-subtitle')) {
+                setCurrentStyleName('Subtítulo');
+              } else if (tag === 'h1') {
+                setCurrentStyleName('Título 1');
+              } else if (tag === 'h2') {
+                setCurrentStyleName('Título 2');
+              } else if (tag === 'h3') {
+                setCurrentStyleName('Título 3');
+              } else if (tag === 'h4') {
+                setCurrentStyleName('Título 4');
+              } else if (tag === 'blockquote') {
+                setCurrentStyleName('Citação');
+              } else {
+                setCurrentStyleName('Parágrafo');
+              }
+            }
+          }
+        }
+      }
     } catch {
       // ignore
     }
@@ -311,92 +411,130 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   // Generic execCommand with focus & selection protection
   const execCmd = (command: string, val: string | undefined = undefined) => {
     if (editorMode !== 'visual') return;
-    if (editorRef.current) {
-      editorRef.current.focus();
-    }
     restoreSelection();
     document.execCommand('styleWithCSS', false, 'true');
     document.execCommand(command, false, val);
+    saveSelection();
     handleContentChange();
     checkActiveFormats();
   };
 
-  // Robust Inline Style Applicator (for Font Size, Font Family, Colors)
+  // Robust Inline Style Applicator (for Font Size, Font Family, Colors) with seamless selection retention
   const applySpanStyle = (styleProp: 'fontSize' | 'fontFamily' | 'color' | 'backgroundColor', styleValue: string) => {
-    if (editorMode !== 'visual') return;
-    if (editorRef.current) {
-      editorRef.current.focus();
-    }
+    if (editorMode !== 'visual' || !editorRef.current) return;
     restoreSelection();
 
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-      // If no text is currently selected, use execCommand styleWithCSS
-      document.execCommand('styleWithCSS', false, 'true');
-      if (styleProp === 'color') document.execCommand('foreColor', false, styleValue);
-      if (styleProp === 'backgroundColor') document.execCommand('hiliteColor', false, styleValue);
-      if (styleProp === 'fontFamily') document.execCommand('fontName', false, styleValue);
-      if (styleProp === 'fontSize') document.execCommand('fontSize', false, styleValue);
+    if (!sel || sel.rangeCount === 0) return;
+
+    const range = expandToWordOrBlockIfCollapsed(sel);
+    if (!range) return;
+
+    // Check if the selection is already inside an existing styled span we can directly modify
+    let targetSpan: HTMLElement | null = null;
+    const startParent = range.startContainer.nodeType === Node.ELEMENT_NODE 
+      ? (range.startContainer as HTMLElement) 
+      : range.startContainer.parentElement;
+
+    if (
+      startParent && 
+      startParent.tagName === 'SPAN' && 
+      editorRef.current.contains(startParent) &&
+      (startParent.textContent?.trim() === range.toString().trim() || range.collapsed)
+    ) {
+      targetSpan = startParent;
+    }
+
+    if (targetSpan) {
+      if (styleProp === 'fontSize') targetSpan.style.fontSize = styleValue;
+      if (styleProp === 'fontFamily') targetSpan.style.fontFamily = styleValue;
+      if (styleProp === 'color') targetSpan.style.color = styleValue;
+      if (styleProp === 'backgroundColor') {
+        if (styleValue === 'transparent') {
+          targetSpan.style.backgroundColor = 'transparent';
+          targetSpan.style.padding = '';
+          targetSpan.style.borderRadius = '';
+        } else {
+          targetSpan.style.backgroundColor = styleValue;
+          targetSpan.style.padding = '0.1rem 0.3rem';
+          targetSpan.style.borderRadius = '2px';
+        }
+      }
+      selectElement(targetSpan);
       handleContentChange();
       return;
     }
 
-    try {
-      const range = sel.getRangeAt(0);
-      const selectedContent = range.extractContents();
-      const span = document.createElement('span');
+    // Apply to selected range without losing selection
+    if (!range.collapsed) {
+      try {
+        const contents = range.extractContents();
+        const span = document.createElement('span');
 
-      if (styleProp === 'fontSize') span.style.fontSize = styleValue;
-      if (styleProp === 'fontFamily') span.style.fontFamily = styleValue;
-      if (styleProp === 'color') span.style.color = styleValue;
-      if (styleProp === 'backgroundColor') {
-        if (styleValue === 'transparent') {
-          span.style.backgroundColor = 'transparent';
-        } else {
-          span.style.backgroundColor = styleValue;
-          span.style.padding = '0.1rem 0.3rem';
-          span.style.borderRadius = '2px';
+        if (styleProp === 'fontSize') span.style.fontSize = styleValue;
+        if (styleProp === 'fontFamily') span.style.fontFamily = styleValue;
+        if (styleProp === 'color') span.style.color = styleValue;
+        if (styleProp === 'backgroundColor') {
+          if (styleValue !== 'transparent') {
+            span.style.backgroundColor = styleValue;
+            span.style.padding = '0.1rem 0.3rem';
+            span.style.borderRadius = '2px';
+          }
         }
+
+        span.appendChild(contents);
+        range.insertNode(span);
+
+        // Keep newly styled span selected!
+        selectElement(span);
+        handleContentChange();
+        return;
+      } catch (e) {
+        console.warn('Error applying inline style:', e);
       }
-
-      span.appendChild(selectedContent);
-      range.insertNode(span);
-
-      // Select newly styled content
-      sel.removeAllRanges();
-      const newRange = document.createRange();
-      newRange.selectNodeContents(span);
-      sel.addRange(newRange);
-      savedSelectionRef.current = newRange;
-
-      handleContentChange();
-    } catch (e) {
-      console.warn('Error applying style:', e);
-      // Fallback
-      document.execCommand('styleWithCSS', false, 'true');
-      if (styleProp === 'color') document.execCommand('foreColor', false, styleValue);
-      if (styleProp === 'backgroundColor') document.execCommand('hiliteColor', false, styleValue);
-      handleContentChange();
     }
+
+    // Fallback
+    document.execCommand('styleWithCSS', false, 'true');
+    if (styleProp === 'color') document.execCommand('foreColor', false, styleValue);
+    if (styleProp === 'backgroundColor') document.execCommand('hiliteColor', false, styleValue);
+    if (styleProp === 'fontFamily') document.execCommand('fontName', false, styleValue);
+    if (styleProp === 'fontSize') document.execCommand('fontSize', false, styleValue);
+    saveSelection();
+    handleContentChange();
   };
 
-  // Apply Heading / Style
+  // Apply Heading / Style with automatic block selection retention
   const handleStyleChange = (tag: string, name: string) => {
     setActivePopover(null);
     setCurrentStyleName(name);
+
+    if (editorMode !== 'visual' || !editorRef.current) return;
+    restoreSelection();
+
     if (tag === 'subtitle') {
-      execCmd('formatBlock', 'p');
+      document.execCommand('formatBlock', false, 'p');
       const sel = window.getSelection();
-      if (sel && sel.anchorNode) {
-        const parent = sel.anchorNode.parentElement;
-        if (parent) {
-          parent.classList.add('editorial-subtitle');
-        }
+      const updatedBlock = getBlockParent(sel?.anchorNode || null);
+      if (updatedBlock) {
+        updatedBlock.className = 'editorial-subtitle font-sans text-xl sm:text-2xl text-zinc-300 font-light italic leading-relaxed my-4';
+        selectElement(updatedBlock);
       }
-      handleContentChange();
-      return;
+    } else {
+      document.execCommand('formatBlock', false, tag);
+      const sel = window.getSelection();
+      const updatedBlock = getBlockParent(sel?.anchorNode || null);
+      if (updatedBlock) {
+        if (tag !== 'p' || updatedBlock.classList.contains('editorial-subtitle')) {
+          updatedBlock.classList.remove('editorial-subtitle');
+        }
+        // Keep the block selected so the user can immediately change font/size/color!
+        selectElement(updatedBlock);
+      }
     }
-    execCmd('formatBlock', tag);
+
+    handleContentChange();
+    checkActiveFormats();
   };
 
   // Apply Font Family
