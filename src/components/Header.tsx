@@ -1,0 +1,167 @@
+import React, { useState, useEffect } from 'react';
+import { Search, Menu, X, Instagram, ArrowUpRight } from 'lucide-react';
+import { Logo } from './Logo';
+import { UserProfile } from '../types';
+
+interface HeaderProps {
+  currentPath: string;
+  onNavigate: (path: string) => void;
+  currentUser?: UserProfile | null;
+}
+
+export const Header: React.FC<HeaderProps> = ({ currentPath, onNavigate, currentUser }) => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const navItems = [
+    { label: 'INÍCIO', path: '/' },
+    { label: 'CRÍTICAS', path: '/criticas' },
+    { label: 'SOBRE', path: '/sobre' },
+  ];
+
+  const handleNavClick = (path: string) => {
+    onNavigate(path);
+    setMobileMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
+    <header 
+      id="main-header"
+      className={`sticky top-0 z-50 bg-black transition-all duration-300 border-b ${
+        isScrolled ? 'border-zinc-800/80 bg-black/95 backdrop-blur-md py-3' : 'border-zinc-900 py-4 sm:py-5'
+      }`}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between">
+          
+          {/* Logo Brand Link */}
+          <button 
+            id="header-logo-btn"
+            onClick={() => handleNavClick('/')} 
+            className="flex items-center text-left focus:outline-none group cursor-pointer"
+            aria-label="Ir para a página inicial"
+          >
+            <Logo size={isScrolled ? 'sm' : 'md'} />
+          </button>
+
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center space-x-8 lg:space-x-10">
+            {navItems.map((item) => {
+              const isActive = currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path));
+              return (
+                <button
+                  key={item.path}
+                  id={`nav-link-${item.label.toLowerCase()}`}
+                  onClick={() => handleNavClick(item.path)}
+                  className={`text-xs uppercase tracking-[0.2em] font-medium transition-all duration-200 relative py-1 cursor-pointer ${
+                    isActive 
+                      ? 'text-white font-semibold' 
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  {item.label}
+                  {isActive && (
+                    <span className="absolute bottom-0 left-0 w-full h-[1px] bg-white animate-in fade-in" />
+                  )}
+                </button>
+              );
+            })}
+
+            {/* Instagram link */}
+            <a
+              id="header-instagram-link"
+              href="https://www.instagram.com/olharesdacena/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400 hover:text-white flex items-center gap-1.5 transition-colors py-1 cursor-pointer"
+              title="Instagram @olharesdacena (Abre em nova aba)"
+            >
+              <Instagram className="w-3.5 h-3.5" />
+              <span>INSTAGRAM</span>
+              <ArrowUpRight className="w-3 h-3 opacity-60" />
+            </a>
+
+            {/* Search Icon Trigger */}
+            <button
+              id="header-search-btn"
+              onClick={() => handleNavClick('/pesquisa')}
+              className={`p-2 transition-colors cursor-pointer rounded-none border border-transparent hover:border-zinc-700 ${
+                currentPath === '/pesquisa' ? 'text-white border-zinc-700 bg-zinc-900' : 'text-zinc-400 hover:text-white'
+              }`}
+              aria-label="Pesquisar críticas"
+              title="Pesquisar no acervo"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+          </nav>
+
+          {/* Mobile menu and Search buttons */}
+          <div className="flex md:hidden items-center space-x-3">
+            <button
+              id="mobile-search-trigger"
+              onClick={() => handleNavClick('/pesquisa')}
+              className="p-2 text-zinc-300 hover:text-white focus:outline-none"
+              aria-label="Pesquisar"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+            <button
+              id="mobile-menu-toggle"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 text-zinc-300 hover:text-white focus:outline-none"
+              aria-label="Abrir menu principal"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Drawer Menu */}
+      {mobileMenuOpen && (
+        <div id="mobile-navigation-drawer" className="md:hidden bg-black border-t border-zinc-900 px-6 pt-4 pb-8 space-y-5 animate-in fade-in slide-in-from-top-4 duration-200">
+          <div className="flex flex-col space-y-4 pt-2">
+            {navItems.map((item) => {
+              const isActive = currentPath === item.path;
+              return (
+                <button
+                  key={item.path}
+                  id={`mobile-nav-${item.label.toLowerCase()}`}
+                  onClick={() => handleNavClick(item.path)}
+                  className={`text-left text-sm uppercase tracking-[0.2em] py-2 border-b border-zinc-900 transition-colors ${
+                    isActive ? 'text-white font-bold pl-2 border-l-2 border-l-white' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+            
+            <a
+              id="mobile-instagram-link"
+              href="https://www.instagram.com/olharesdacena/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-left text-sm uppercase tracking-[0.2em] py-2 text-zinc-400 hover:text-white flex items-center justify-between"
+            >
+              <span className="flex items-center gap-2">
+                <Instagram className="w-4 h-4" />
+                INSTAGRAM (@olharesdacena)
+              </span>
+              <ArrowUpRight className="w-4 h-4 text-zinc-500" />
+            </a>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+};

@@ -1,0 +1,34 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Critiques collection
+    match /criticas/{criticaId} {
+      // Anyone can read published critiques or if admin is signed in they can read all (including drafts)
+      allow read: if resource == null || resource.data.publicada == true || isAuthenticated();
+      // Only authenticated admins can create, update or delete
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Categories collection
+    match /categorias/{categoriaId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // System configurations and media metadata
+    match /configuracoes/{configId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Default deny for anything else
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

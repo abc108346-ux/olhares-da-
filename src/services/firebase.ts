@@ -1,0 +1,292 @@
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  getDocs, 
+  getDoc, 
+  setDoc, 
+  deleteDoc, 
+  updateDoc, 
+  query, 
+  where, 
+  orderBy, 
+  Timestamp 
+} from 'firebase/firestore';
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut, 
+  onAuthStateChanged as onFirebaseAuthStateChanged,
+  User 
+} from 'firebase/auth';
+import { Critica, UserProfile } from '../types';
+import { INITIAL_CRITICAS } from '../data/initialCriticas';
+import firebaseConfigJson from '../../firebase-applet-config.json';
+
+// Local storage backup key
+const STORAGE_KEY = 'olhares_da_cena_criticas_v2';
+const ADMIN_SESSION_KEY = 'olhares_da_cena_admin_session';
+
+const viteEnv = (import.meta as any).env || {};
+
+// Build Firebase configuration
+const projectId = viteEnv.VITE_FIREBASE_PROJECT_ID || firebaseConfigJson.projectId;
+const firebaseConfig = {
+  apiKey: viteEnv.VITE_FIREBASE_API_KEY || firebaseConfigJson.apiKey,
+  authDomain: viteEnv.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfigJson.authDomain || `${projectId}.firebaseapp.com`,
+  projectId: projectId,
+  storageBucket: viteEnv.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfigJson.storageBucket || `${projectId}.firebasestorage.app`,
+  messagingSenderId: viteEnv.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfigJson.messagingSenderId,
+  appId: viteEnv.VITE_FIREBASE_APP_ID || firebaseConfigJson.appId,
+};
+
+// Initialize Firebase App
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+// Initialize Firestore
+const databaseId = viteEnv.VITE_FIREBASE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId;
+export const db = databaseId && databaseId !== '(default)'
+  ? getFirestore(app, databaseId)
+  : getFirestore(app);
+
+// Initialize Auth
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
+
+// Local Cache Helpers
+export const getLocalCriticas = (): Critica[] => {
+  try {
+    const cached = localStorage.getItem(STORAGE_KEY);
+    if (cached !== null) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not read from localStorage:', e);
+  }
+  // Default to initial dataset (which is empty [])
+  return INITIAL_CRITICAS;
+};
+
+export const setLocalCriticas = (items: Critica[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  } catch (e) {
+    console.warn('Could not write to localStorage:', e);
+  }
+};
+
+/**
+ * Fetch all critiques with sorting and optional published filter.
+ */
+export const fetchAllCriticas = async (onlyPublished = true): Promise<Critica[]> => {
+  try {
+    const criticasRef = collection(db, 'criticas');
+    const snapshot = await getDocs(criticasRef);
+    
+    if (!snapshot.empty) {
+      const items: Critica[] = [];
+      snapshot.forEach((d) => {
+        const data = d.data() as Critica;
+        items.push({
+          ...data,
+          id: d.id,
+        });
+      });
+
+      // Sort by publication date descending
+      items.sort((a, b) => new Date(b.dataPublicacao).getTime() - new Date(a.dataPublicacao).getTime());
+      
+      // Update local cache
+      setLocalCriticas(items);
+      
+      if (onlyPublished) {
+        return items.filter(c => c.publicada);
+      }
+      return items;
+    }
+  } catch (err) {
+    console.warn('Firestore fetch error, falling back to local storage:', err);
+  }
+
+  // Fallback to local storage / initial state
+  const local = getLocalCriticas();
+  local.sort((a, b) => new Date(b.dataPublicacao).getTime() - new Date(a.dataPublicacao).getTime());
+  if (onlyPublished) {
+    return local.filter(c => c.publicada);
+  }
+  return local;
+};
+
+/**
+ * Fetch a single critique by its friendly slug.
+ */
+export const fetchCriticaBySlug = async (slug: string): Promise<Critica | null> => {
+  try {
+    const criticasRef = collection(db, 'criticas');
+    const q = query(criticasRef, where('slug', '==', slug));
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+      const docData = snapshot.docs[0].data() as Critica;
+      return {
+        ...docData,
+        id: snapshot.docs[0].id,
+      };
+    }
+  } catch (err) {
+    console.warn('Firestore slug lookup fallback to local:', err);
+  }
+
+  const local = getLocalCriticas();
+  const found = local.find(c => c.slug === slug);
+  return found || null;
+};
+
+/**
+ * Save or update a critique in Firestore and local storage.
+ */
+export const saveCriticaToDb = async (critica: Critica): Promise<Critica> => {
+  const finalCritica = {
+    ...critica,
+    dataAtualizacao: new Date().toISOString().split('T')[0],
+  };
+
+  // 1. Update local storage immediately for fast UI feedback
+  const local = getLocalCriticas();
+  const index = local.findIndex(c => c.id === finalCritica.id || c.slug === finalCritica.slug);
+  if (index >= 0) {
+    local[index] = finalCritica;
+  } else {
+    local.unshift(finalCritica);
+  }
+  setLocalCriticas(local);
+
+  // 2. Persist to Firestore
+  try {
+    const docRef = doc(db, 'criticas', finalCritica.id);
+    await setDoc(docRef, finalCritica, { merge: true });
+  } catch (err) {
+    console.warn('Could not write directly to Firestore (using local persistence):', err);
+  }
+
+  return finalCritica;
+};
+
+/**
+ * Delete a critique from Firestore and local storage.
+ */
+export const deleteCriticaFromDb = async (id: string): Promise<boolean> => {
+  // 1. Remove from local storage
+  const local = getLocalCriticas().filter(c => c.id !== id);
+  setLocalCriticas(local);
+
+  // 2. Remove from Firestore
+  try {
+    const docRef = doc(db, 'criticas', id);
+    await deleteDoc(docRef);
+    return true;
+  } catch (err) {
+    console.warn('Could not delete from Firestore (deleted locally):', err);
+    return true;
+  }
+};
+
+/**
+ * Seed initial sample dataset to Firestore if it's empty or on demand.
+ */
+export const seedDatabaseIfEmpty = async (): Promise<void> => {
+  try {
+    const snapshot = await getDocs(collection(db, 'criticas'));
+    if (snapshot.empty) {
+      console.log('Seeding initial Olhares da Cena critiques to Firestore...');
+      for (const item of INITIAL_CRITICAS) {
+        await setDoc(doc(db, 'criticas', item.id), item);
+      }
+    }
+  } catch (err) {
+    console.warn('Could not auto-seed to Firestore:', err);
+  }
+};
+
+/**
+ * Admin Authentication Helpers
+ * Uses strictly Firebase Authentication (email/password or Google Sign-In) configured by the user in Firebase Console.
+ */
+export const subscribeToAuth = (callback: (user: UserProfile | null) => void) => {
+  return onFirebaseAuthStateChanged(auth, (user: User | null) => {
+    if (user) {
+      const userProfile: UserProfile = {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || 'Editor(a) Olhares da Cena',
+        photoURL: user.photoURL,
+        isAdmin: true,
+      };
+      localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(userProfile));
+      callback(userProfile);
+    } else {
+      localStorage.removeItem(ADMIN_SESSION_KEY);
+      callback(null);
+    }
+  });
+};
+
+export const loginWithEmail = async (email: string, pass: string): Promise<UserProfile> => {
+  const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
+  const userProfile: UserProfile = {
+    uid: cred.user.uid,
+    email: cred.user.email,
+    displayName: cred.user.displayName || 'Editor(a) Olhares da Cena',
+    photoURL: cred.user.photoURL,
+    isAdmin: true,
+  };
+  localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(userProfile));
+  return userProfile;
+};
+
+export const registerAdminWithEmail = async (email: string, pass: string): Promise<UserProfile> => {
+  const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
+  const userProfile: UserProfile = {
+    uid: cred.user.uid,
+    email: cred.user.email,
+    displayName: cred.user.displayName || 'Editor(a) Olhares da Cena',
+    photoURL: cred.user.photoURL,
+    isAdmin: true,
+  };
+  localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(userProfile));
+  return userProfile;
+};
+
+export const loginWithGoogleAccount = async (): Promise<UserProfile> => {
+  try {
+    const cred = await signInWithPopup(auth, googleProvider);
+    const userProfile: UserProfile = {
+      uid: cred.user.uid,
+      email: cred.user.email,
+      displayName: cred.user.displayName || 'Editor(a) Olhares da Cena',
+      photoURL: cred.user.photoURL,
+      isAdmin: true,
+    };
+    localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(userProfile));
+    return userProfile;
+  } catch (err: any) {
+    console.error('Google Sign-in error:', err);
+    throw err;
+  }
+};
+
+export const logoutAdminUser = async () => {
+  localStorage.removeItem(ADMIN_SESSION_KEY);
+  try {
+    await signOut(auth);
+  } catch {
+    // ignore
+  }
+};

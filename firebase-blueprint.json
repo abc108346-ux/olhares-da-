@@ -1,0 +1,30 @@
+{
+  "entities": {
+    "criticas": {
+      "title": "Críticas",
+      "description": "Críticas e ensaios de artes cênicas",
+      "type": "object",
+      "properties": {
+        "titulo": { "type": "string" },
+        "slug": { "type": "string" },
+        "resumo": { "type": "string" },
+        "conteudo": { "type": "string" },
+        "autor": { "type": "string" },
+        "categoria": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "dataPublicacao": { "type": "string" },
+        "dataAtualizacao": { "type": "string" },
+        "imagemPrincipal": { "type": "string" },
+        "imagens": { "type": "array", "items": { "type": "string" } },
+        "publicada": { "type": "boolean" },
+        "nomeEspetaculo": { "type": "string" },
+        "companhia": { "type": "string" },
+        "cidade": { "type": "string" },
+        "estado": { "type": "string" },
+        "fichaTecnica": { "type": "object" },
+        "destaque": { "type": "boolean" }
+      },
+      "required": ["titulo", "slug", "resumo", "conteudo", "categoria", "dataPublicacao"]
+    }
+  }
+}

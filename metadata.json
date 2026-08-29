@@ -1,0 +1,6 @@
+{
+  "name": "Olhares da Cena",
+  "description": "Crítica, reflexão e arquivo sobre teatro, dança e artes cênicas contemporâneas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
