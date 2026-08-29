@@ -1695,6 +1695,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                     <div className={`w-5 h-5 flex items-center justify-center border transition-colors ${paginaFormData.publicada ? 'bg-white border-white' : 'bg-black border-zinc-700 group-hover:border-zinc-500'}`}>
                       {paginaFormData.publicada && <Check className="w-3.5 h-3.5 text-black" />}
                     </div>
+                    <input 
+                      type="checkbox" 
+                      className="hidden" 
+                      checked={paginaFormData.publicada} 
+                      onChange={(e) => setPaginaFormData({ ...paginaFormData, publicada: e.target.checked })} 
+                    />
                     <span className="text-sm text-zinc-300 select-none font-medium uppercase tracking-wider">
                       Página Publicada
                     </span>
@@ -1706,6 +1712,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                         <div className={`w-5 h-5 flex items-center justify-center border transition-colors ${paginaFormData.mostrarNoHeader ? 'bg-white border-white' : 'bg-black border-zinc-700 group-hover:border-zinc-500'}`}>
                           {paginaFormData.mostrarNoHeader && <Check className="w-3.5 h-3.5 text-black" />}
                         </div>
+                        <input 
+                          type="checkbox" 
+                          className="hidden" 
+                          checked={paginaFormData.mostrarNoHeader} 
+                          onChange={(e) => setPaginaFormData({ ...paginaFormData, mostrarNoHeader: e.target.checked })} 
+                        />
                         <span className="text-sm text-zinc-300 select-none font-medium uppercase tracking-wider">
                           Mostrar no Header
                         </span>
@@ -1728,6 +1740,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                         <div className={`w-5 h-5 flex items-center justify-center border transition-colors ${paginaFormData.mostrarNoFooter ? 'bg-white border-white' : 'bg-black border-zinc-700 group-hover:border-zinc-500'}`}>
                           {paginaFormData.mostrarNoFooter && <Check className="w-3.5 h-3.5 text-black" />}
                         </div>
+                        <input 
+                          type="checkbox" 
+                          className="hidden" 
+                          checked={paginaFormData.mostrarNoFooter} 
+                          onChange={(e) => setPaginaFormData({ ...paginaFormData, mostrarNoFooter: e.target.checked })} 
+                        />
                         <span className="text-sm text-zinc-300 select-none font-medium uppercase tracking-wider">
                           Mostrar no Footer
                         </span>
