@@ -610,9 +610,17 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         </button>
       </div>
 
+      {/* Mobile backdrop overlay */}
+      {mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-30 md:hidden animate-in fade-in"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
       <aside className={`
         fixed inset-y-0 left-0 z-40 w-64 bg-zinc-950 border-r border-zinc-850 flex flex-col justify-between transition-transform duration-300
-        md:translate-x-0 md:static md:h-screen md:sticky md:top-0 overflow-y-auto
+        md:translate-x-0 md:sticky md:top-0 md:h-screen flex-shrink-0 overflow-y-auto
         ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         <div className="p-6 space-y-6 flex-1 overflow-y-auto">
@@ -759,19 +767,21 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       </aside>
 
       {/* =========================================================================
-          2. MAIN CONTENT VIEW
+          2. MAIN CONTENT & FOOTER COLUMN
          ========================================================================= */}
-      <main className="flex-1 min-h-screen bg-black p-4 sm:p-8 lg:p-10 overflow-y-auto">
-        
-        {/* Notification Toast */}
-        {notification && (
-          <div className={`fixed top-6 right-6 z-50 p-4 border max-w-md shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-3 ${
-            notification.type === 'success' ? 'bg-zinc-950 border-white text-white' : 'bg-red-950 border-red-700 text-red-100'
-          }`}>
-            {notification.type === 'success' ? <CheckCircle className="w-5 h-5 text-white" /> : <AlertCircle className="w-5 h-5 text-red-400" />}
-            <span className="text-xs font-mono">{notification.message}</span>
-          </div>
-        )}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen bg-black">
+        <main className="flex-1 p-4 sm:p-8 lg:p-10">
+          <div className="w-full max-w-7xl mx-auto">
+            
+            {/* Notification Toast */}
+            {notification && (
+              <div className={`fixed top-6 right-6 z-50 p-4 border max-w-md shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-3 ${
+                notification.type === 'success' ? 'bg-zinc-950 border-white text-white' : 'bg-red-950 border-red-700 text-red-100'
+              }`}>
+                {notification.type === 'success' ? <CheckCircle className="w-5 h-5 text-white" /> : <AlertCircle className="w-5 h-5 text-red-400" />}
+                <span className="text-xs font-mono">{notification.message}</span>
+              </div>
+            )}
 
         {/* ==========================================================
             VIEW: DASHBOARD
@@ -869,16 +879,16 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   <thead className="bg-zinc-900 border-b border-zinc-800 text-[10px] uppercase font-mono tracking-widest text-zinc-400">
                     <tr>
                       <th className="p-3.5">Título / Espetáculo</th>
-                      <th className="p-3.5">Categoria</th>
-                      <th className="p-3.5">Data</th>
-                      <th className="p-3.5">Status</th>
-                      <th className="p-3.5 text-right">Ações</th>
+                      <th className="p-3.5 whitespace-nowrap">Categoria</th>
+                      <th className="p-3.5 whitespace-nowrap">Data</th>
+                      <th className="p-3.5 whitespace-nowrap">Status</th>
+                      <th className="p-3.5 text-right whitespace-nowrap">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-900">
                     {criticas.slice(0, 5).map((critica) => (
                       <tr key={critica.id} className="hover:bg-zinc-900/50 transition-colors">
-                        <td className="p-3.5">
+                        <td className="p-3.5 min-w-[240px]">
                           <div className="font-serif font-bold text-sm text-white uppercase">
                             {critica.titulo}
                           </div>
@@ -886,22 +896,22 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                             {critica.nomeEspetaculo} • {critica.cidade || 'RS'}
                           </div>
                         </td>
-                        <td className="p-3.5">
+                        <td className="p-3.5 whitespace-nowrap">
                           <span className="px-2 py-0.5 bg-black border border-zinc-800 text-[10px] uppercase font-mono">
                             {critica.categoria}
                           </span>
                         </td>
-                        <td className="p-3.5 font-mono text-[11px] text-zinc-400">
+                        <td className="p-3.5 font-mono text-[11px] text-zinc-400 whitespace-nowrap">
                           {formatDateBr(critica.dataPublicacao)}
                         </td>
-                        <td className="p-3.5">
+                        <td className="p-3.5 whitespace-nowrap">
                           <span className={`inline-flex items-center gap-1 text-[10px] font-mono uppercase px-2 py-0.5 border ${
                             critica.publicada ? 'border-emerald-800 bg-emerald-950/40 text-emerald-300' : 'border-zinc-700 bg-zinc-900 text-zinc-400'
                           }`}>
                             {critica.publicada ? 'Publicada' : 'Rascunho'}
                           </span>
                         </td>
-                        <td className="p-3.5 text-right space-x-2">
+                        <td className="p-3.5 text-right whitespace-nowrap space-x-2">
                           <button
                             onClick={() => handleOpenEditCritica(critica)}
                             className="p-1.5 bg-zinc-900 hover:bg-white hover:text-black border border-zinc-800 text-zinc-300 transition-colors cursor-pointer"
@@ -997,12 +1007,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
               <table className="w-full text-left text-xs font-sans">
                 <thead className="bg-zinc-900 border-b border-zinc-800 text-[10px] uppercase font-mono tracking-widest text-zinc-400">
                   <tr>
-                    <th className="p-3.5">Mídia</th>
+                    <th className="p-3.5 whitespace-nowrap">Mídia</th>
                     <th className="p-3.5">Título</th>
-                    <th className="p-3.5">Categoria</th>
-                    <th className="p-3.5">Data</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5 text-right">Ações</th>
+                    <th className="p-3.5 whitespace-nowrap">Categoria</th>
+                    <th className="p-3.5 whitespace-nowrap">Data</th>
+                    <th className="p-3.5 whitespace-nowrap">Status</th>
+                    <th className="p-3.5 text-right whitespace-nowrap">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-900">
@@ -1018,7 +1028,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                           }}
                         />
                       </td>
-                      <td className="p-3.5">
+                      <td className="p-3.5 min-w-[260px]">
                         <div className="font-serif font-bold text-sm text-white uppercase">
                           {critica.titulo}
                         </div>
@@ -1608,15 +1618,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   <thead className="bg-zinc-950/80 border-b border-zinc-850">
                     <tr>
                       <th className="p-4 font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Página</th>
-                      <th className="p-4 font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Header / Footer</th>
-                      <th className="p-4 font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Status</th>
-                      <th className="p-4 font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium text-right">Ações</th>
+                      <th className="p-4 font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium whitespace-nowrap">Header / Footer</th>
+                      <th className="p-4 font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium whitespace-nowrap">Status</th>
+                      <th className="p-4 font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium text-right whitespace-nowrap">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-900">
                     {filteredPaginas.map((pagina) => (
                       <tr key={pagina.id} className="hover:bg-zinc-900/50 transition-colors">
-                        <td className="p-4">
+                        <td className="p-4 min-w-[220px]">
                           <div className="font-serif font-bold text-sm text-white uppercase">{pagina.titulo}</div>
                           <div className="text-[10px] text-zinc-500 font-mono mt-0.5">/{pagina.slug}</div>
                         </td>
@@ -2083,31 +2093,33 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
           </div>
         )}
 
-      </main>
-
-      {/* Admin Bottom Footer Credit Bar */}
-      <footer id="admin-footer" className="border-t border-zinc-900 bg-black/90 py-6 px-4 sm:px-8 text-xs text-zinc-400">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-            <span>© {new Date().getFullYear()} Olhares da Cena — Painel Administrativo</span>
-            <span className="hidden sm:inline text-zinc-700">•</span>
-            <a
-              id="admin-footer-author-credit"
-              href="https://bwwebdesign.vercel.app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center sm:justify-start gap-1.5 text-zinc-400 hover:text-white transition-all group"
-            >
-              <span>Produzido por</span>
-              <span className="font-semibold text-amber-400 hover:text-amber-300 transition-colors underline decoration-amber-400/50 hover:decoration-amber-300 underline-offset-4 tracking-wide">
-                BW Bernardo Web Design
-              </span>
-              <ArrowUpRight className="w-3.5 h-3.5 text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-            </a>
           </div>
-          <span className="text-[11px] text-zinc-400 font-mono">v2.5 • Produção Editorial</span>
-        </div>
-      </footer>
+        </main>
+
+        {/* Admin Bottom Footer Credit Bar */}
+        <footer id="admin-footer" className="border-t border-zinc-900 bg-zinc-950 py-6 px-4 sm:px-8 text-xs text-zinc-400 mt-auto">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <span>© {new Date().getFullYear()} Olhares da Cena — Painel Administrativo</span>
+              <span className="hidden sm:inline text-zinc-700">•</span>
+              <a
+                id="admin-footer-author-credit"
+                href="https://bwwebdesign.vercel.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center sm:justify-start gap-1.5 text-zinc-400 hover:text-white transition-all group"
+              >
+                <span>Produzido por</span>
+                <span className="font-semibold text-amber-400 hover:text-amber-300 transition-colors underline decoration-amber-400/50 hover:decoration-amber-300 underline-offset-4 tracking-wide">
+                  BW Bernardo Web Design
+                </span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </a>
+            </div>
+            <span className="text-[11px] text-zinc-400 font-mono">v2.5 • Produção Editorial</span>
+          </div>
+        </footer>
+      </div>
 
       {/* Delete Confirmation Modal for Critica */}
       <ModalConfirm

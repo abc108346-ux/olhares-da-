@@ -53,10 +53,10 @@ const firebaseConfig = {
 // Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firestore with long polling enabled for container and sandbox environments
+// Initialize Firestore with auto-detect long polling for optimal connection stability
 const databaseId = viteEnv.VITE_FIREBASE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId;
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
+  experimentalAutoDetectLongPolling: true,
   ignoreUndefinedProperties: true,
 }, databaseId && databaseId !== '(default)' ? databaseId : undefined);
 
@@ -153,7 +153,9 @@ export const subscribeToCriticas = (callback: (criticas: Critica[]) => void) => 
       setLocalCriticas(items);
       callback(items);
     }, (error) => {
-      console.warn('Real-time criticas snapshot error:', error);
+      if ((error as any)?.code !== 'unavailable') {
+        console.warn('Real-time criticas snapshot error:', error);
+      }
       callback(getLocalCriticas());
     });
   } catch (err) {
@@ -181,7 +183,9 @@ export const subscribeToPaginas = (callback: (paginas: Pagina[]) => void) => {
         callback(getLocalPaginas());
       }
     }, (error) => {
-      console.warn('Real-time paginas snapshot error:', error);
+      if ((error as any)?.code !== 'unavailable') {
+        console.warn('Real-time paginas snapshot error:', error);
+      }
       callback(getLocalPaginas());
     });
   } catch (err) {

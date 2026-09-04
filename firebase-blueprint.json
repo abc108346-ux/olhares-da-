@@ -1,7 +1,7 @@
 {
   "entities": {
-    "criticas": {
-      "title": "Críticas",
+    "critica": {
+      "title": "Crítica",
       "description": "Críticas e ensaios de artes cênicas",
       "type": "object",
       "properties": {
@@ -11,20 +11,55 @@
         "conteudo": { "type": "string" },
         "autor": { "type": "string" },
         "categoria": { "type": "string" },
-        "tags": { "type": "array", "items": { "type": "string" } },
+        "tags": { "type": "array" },
         "dataPublicacao": { "type": "string" },
         "dataAtualizacao": { "type": "string" },
         "imagemPrincipal": { "type": "string" },
-        "imagens": { "type": "array", "items": { "type": "string" } },
         "publicada": { "type": "boolean" },
-        "nomeEspetaculo": { "type": "string" },
-        "companhia": { "type": "string" },
-        "cidade": { "type": "string" },
-        "estado": { "type": "string" },
-        "fichaTecnica": { "type": "object" },
-        "destaque": { "type": "boolean" }
+        "nomeEspetaculo": { "type": "string" }
       },
       "required": ["titulo", "slug", "resumo", "conteudo", "categoria", "dataPublicacao"]
+    },
+    "pagina": {
+      "title": "Página",
+      "description": "Páginas institucionais e editoriais",
+      "type": "object",
+      "properties": {
+        "titulo": { "type": "string" },
+        "slug": { "type": "string" },
+        "resumo": { "type": "string" },
+        "conteudo": { "type": "string" },
+        "publicada": { "type": "boolean" },
+        "dataCriacao": { "type": "string" },
+        "dataAtualizacao": { "type": "string" },
+        "mostrarNoHeader": { "type": "boolean" },
+        "mostrarNoFooter": { "type": "boolean" }
+      },
+      "required": ["titulo", "slug", "conteudo"]
+    },
+    "homeSettings": {
+      "title": "Configurações da Página Inicial",
+      "description": "Imagens e textos em destaque na página inicial",
+      "type": "object",
+      "properties": {
+        "heroImageUrl": { "type": "string" },
+        "manifestoText": { "type": "string" },
+        "manifestoCaption": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/criticas/{criticaId}": {
+      "schema": { "$ref": "#/entities/critica" },
+      "description": "Coleção de artigos de críticas de artes cênicas"
+    },
+    "/paginas/{paginaId}": {
+      "schema": { "$ref": "#/entities/pagina" },
+      "description": "Coleção de páginas institucionais"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/homeSettings" },
+      "description": "Configurações do site"
     }
   }
 }
