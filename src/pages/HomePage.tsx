@@ -17,15 +17,28 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
   
   const [homeSettings, setHomeSettings] = useState<HomeSettings>({
     heroImageUrl: "https://blogger.googleusercontent.com/img/a/AVvXsEhElA3KqcSpB1S-r4XP-FkCjJEjxjOLu0stZo9jyNzaKsom_FKQtibjmxUTU-WyYpJvyCAqWk-gCSF9-TC0X8AihtdD8nz6UTpM_PLcqEY1wUGxVm4RPqqASBiIgM-RuB5dtoYwf4BlLAoMa0zEFDUiL2wLcODiESPk7Y6RltvXOR7579sZqUb_t4gtcn2O=s910",
-    manifestoText: "A crítica de teatro não é um tribunal de julgamentos sumários, mas o prolongamento da experiência sensível do palco através da escrita e do debate rigoroso.",
+    manifestoText: "Olhares da Cena é um espaço de crítica, reflexão e memória dedicado às artes da cena, onde o acontecimento teatral encontra o pensamento, o olhar e a palavra.",
     manifestoCaption: "Olhares da Cena • Arquivo Crítico"
   });
 
   useEffect(() => {
     const fetchSettings = async () => {
       const settings = await getHomeSettings();
-      if (settings && settings.heroImageUrl && !settings.heroImageUrl.includes('unsplash.com') && !settings.heroImageUrl.includes('postimg.cc')) {
-        setHomeSettings(settings);
+      if (settings) {
+        const oldPhrase = "A crítica de teatro não é um tribunal de julgamentos sumários, mas o prolongamento da experiência sensível do palco através da escrita e do debate rigoroso.";
+        const isOld = !settings.manifestoText || settings.manifestoText.trim() === oldPhrase.trim();
+        const updatedManifesto = isOld
+          ? "Olhares da Cena é um espaço de crítica, reflexão e memória dedicado às artes da cena, onde o acontecimento teatral encontra o pensamento, o olhar e a palavra."
+          : settings.manifestoText;
+
+        const updatedSettings: HomeSettings = {
+          ...settings,
+          manifestoText: updatedManifesto,
+          heroImageUrl: (settings.heroImageUrl && !settings.heroImageUrl.includes('unsplash.com') && !settings.heroImageUrl.includes('postimg.cc'))
+            ? settings.heroImageUrl
+            : "https://blogger.googleusercontent.com/img/a/AVvXsEhElA3KqcSpB1S-r4XP-FkCjJEjxjOLu0stZo9jyNzaKsom_FKQtibjmxUTU-WyYpJvyCAqWk-gCSF9-TC0X8AihtdD8nz6UTpM_PLcqEY1wUGxVm4RPqqASBiIgM-RuB5dtoYwf4BlLAoMa0zEFDUiL2wLcODiESPk7Y6RltvXOR7579sZqUb_t4gtcn2O=s910"
+        };
+        setHomeSettings(updatedSettings);
       }
     };
     fetchSettings();

@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
-  initializeFirestore,
+  getFirestore,
+  setLogLevel,
   collection, 
   doc, 
   getDocs, 
@@ -50,15 +51,19 @@ const firebaseConfig = {
   appId: viteEnv.VITE_FIREBASE_APP_ID || firebaseConfigJson.appId,
 };
 
+// Silence internal SDK connection retries and transient offline diagnostic logs
+try {
+  setLogLevel('silent');
+} catch {
+  // ignore
+}
+
 // Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firestore with auto-detect long polling for optimal connection stability
+// Initialize Firestore using canonical getFirestore with designated databaseId
 const databaseId = viteEnv.VITE_FIREBASE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId;
-export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
-  ignoreUndefinedProperties: true,
-}, databaseId && databaseId !== '(default)' ? databaseId : undefined);
+export const db = getFirestore(app, databaseId && databaseId !== '(default)' ? databaseId : undefined);
 
 // Initialize Auth
 export const auth = getAuth(app);
@@ -438,7 +443,9 @@ export const getHomeSettings = async (): Promise<HomeSettings | null> => {
       return snapshot.data() as HomeSettings;
     }
   } catch (err) {
-    console.warn('Could not fetch home settings from Firestore:', err);
+    if ((err as any)?.code !== 'unavailable') {
+      console.warn('Could not fetch home settings from Firestore:', err);
+    }
   }
   return null;
 };
