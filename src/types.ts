@@ -99,6 +99,7 @@ export interface SiteInteressante {
   titulo: string;
   url: string;
   descricao?: string;
+  favicon?: string;
   ordem?: number;
   ativo: boolean;
   criadoEm?: string;

@@ -55,6 +55,22 @@
         "totalViews": { "type": "number" },
         "lastViewAt": { "type": "string" }
       }
+    },
+    "siteInteressante": {
+      "title": "Site Interessante",
+      "description": "Referências e portais de artes cênicas recomendados",
+      "type": "object",
+      "properties": {
+        "titulo": { "type": "string" },
+        "url": { "type": "string" },
+        "descricao": { "type": "string" },
+        "favicon": { "type": "string" },
+        "ordem": { "type": "number" },
+        "ativo": { "type": "boolean" },
+        "criadoEm": { "type": "string" },
+        "atualizadoEm": { "type": "string" }
+      },
+      "required": ["titulo", "url", "ativo"]
     }
   },
   "firestore": {
@@ -69,6 +85,10 @@
     "/settings/{settingId}": {
       "schema": { "$ref": "#/entities/siteStats" },
       "description": "Configurações e estatísticas do site"
+    },
+    "/sites_interessantes/{siteId}": {
+      "schema": { "$ref": "#/entities/siteInteressante" },
+      "description": "Coleção de links e sites interessantes"
     }
   }
 }

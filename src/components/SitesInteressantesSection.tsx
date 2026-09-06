@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { SiteInteressante } from '../types';
-import { Globe, ArrowUpRight, ExternalLink, Bookmark } from 'lucide-react';
+import { Globe, ArrowUpRight, Bookmark } from 'lucide-react';
+import { getFaviconFromUrl } from '../services/firebase';
 
 interface SitesInteressantesSectionProps {
   sites: SiteInteressante[];
@@ -36,33 +37,71 @@ export const SitesInteressantesSection: React.FC<SitesInteressantesSectionProps>
       {/* Sites List or Empty State */}
       {activeSites.length > 0 ? (
         <ul className="space-y-3">
-          {activeSites.map((site) => (
-            <li key={site.id}>
-              <a
-                href={site.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group block p-3 bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-all duration-200"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-xs sm:text-sm font-medium text-zinc-200 group-hover:text-white transition-colors leading-snug">
-                    {site.titulo}
-                  </span>
-                  <ArrowUpRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-white transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 shrink-0 mt-0.5" />
-                </div>
-                {site.descricao && (
-                  <p className="text-[11px] text-zinc-400 font-light mt-1 line-clamp-2 leading-relaxed">
-                    {site.descricao}
-                  </p>
-                )}
-                <div className="mt-1.5 flex items-center gap-1 text-[10px] font-mono text-zinc-500 truncate">
-                  <span className="truncate">
-                    {site.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
-                  </span>
-                </div>
-              </a>
-            </li>
-          ))}
+          {activeSites.map((site) => {
+            const faviconSrc = site.favicon || getFaviconFromUrl(site.url);
+
+            return (
+              <li key={site.id}>
+                <a
+                  href={site.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group block p-3 bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-all duration-200"
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Favicon Icon */}
+                    <div className="w-6 h-6 rounded bg-zinc-950 border border-zinc-800 flex items-center justify-center shrink-0 mt-0.5 overflow-hidden p-0.5">
+                      {faviconSrc ? (
+                        <img
+                          src={faviconSrc}
+                          alt=""
+                          className="w-4 h-4 object-contain rounded-xs"
+                          onError={(e) => {
+                            // Fallback if image fails to load
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent && !parent.querySelector('svg')) {
+                              const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                              svg.setAttribute('class', 'w-3 h-3 text-zinc-500');
+                              svg.setAttribute('viewBox', '0 0 24 24');
+                              svg.setAttribute('fill', 'none');
+                              svg.setAttribute('stroke', 'currentColor');
+                              svg.setAttribute('stroke-width', '2');
+                              svg.innerHTML = '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>';
+                              parent.appendChild(svg);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <Globe className="w-3.5 h-3.5 text-zinc-500" />
+                      )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs sm:text-sm font-medium text-zinc-200 group-hover:text-white transition-colors leading-snug">
+                          {site.titulo}
+                        </span>
+                        <ArrowUpRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-white transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 shrink-0 mt-0.5" />
+                      </div>
+                      {site.descricao && (
+                        <p className="text-[11px] text-zinc-400 font-light mt-1 line-clamp-2 leading-relaxed">
+                          {site.descricao}
+                        </p>
+                      )}
+                      <div className="mt-1.5 flex items-center gap-1 text-[10px] font-mono text-zinc-500 truncate">
+                        <span className="truncate">
+                          {site.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </a>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <div className="py-6 px-3 text-center border border-dashed border-zinc-800/80 bg-zinc-950">

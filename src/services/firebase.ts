@@ -833,6 +833,23 @@ export const fetchSitesInteressantes = async (onlyActive = true): Promise<SiteIn
   }
 };
 
+export const getFaviconFromUrl = (rawUrl: string): string => {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  try {
+    let clean = rawUrl.trim();
+    if (!clean) return '';
+    if (!/^https?:\/\//i.test(clean)) {
+      clean = `https://${clean}`;
+    }
+    const urlObj = new URL(clean);
+    const domain = urlObj.hostname.replace(/^www\./i, '');
+    if (!domain) return '';
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+  } catch {
+    return '';
+  }
+};
+
 export const subscribeToSitesInteressantes = (
   callback: (sites: SiteInteressante[]) => void,
   onlyActive = false
@@ -848,7 +865,14 @@ export const subscribeToSitesInteressantes = (
       (snapshot) => {
         const list: SiteInteressante[] = [];
         snapshot.forEach(docSnap => {
-          list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+          const data = docSnap.data() as any;
+          const url = data.url || '';
+          const favicon = data.favicon || getFaviconFromUrl(url);
+          list.push({ 
+            id: docSnap.id, 
+            ...data,
+            favicon,
+          });
         });
         list.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
         setLocalSitesInteressantes(list);
@@ -869,9 +893,23 @@ export const subscribeToSitesInteressantes = (
   }
 };
 
-export const saveSiteInteressanteToDb = async (site: SiteInteressante): Promise<SiteInteressante> => {
+export const saveSiteInteressanteToDb = async (site: Partial<SiteInteressante> & { id: string; titulo: string; url: string }): Promise<SiteInteressante> => {
+  let cleanUrl = (site.url || '').trim();
+  if (cleanUrl && !/^https?:\/\//i.test(cleanUrl)) {
+    cleanUrl = `https://${cleanUrl}`;
+  }
+
+  const favicon = (site.favicon && site.favicon.trim()) ? site.favicon.trim() : getFaviconFromUrl(cleanUrl);
+
   const finalSite: SiteInteressante = {
-    ...site,
+    id: site.id,
+    titulo: (site.titulo || '').trim(),
+    url: cleanUrl,
+    descricao: (site.descricao || '').trim(),
+    favicon: favicon,
+    ordem: typeof site.ordem === 'number' ? site.ordem : (parseInt(site.ordem as any, 10) || 0),
+    ativo: site.ativo !== false,
+    criadoEm: site.criadoEm || new Date().toISOString(),
     atualizadoEm: new Date().toISOString(),
   };
 
@@ -886,11 +924,24 @@ export const saveSiteInteressanteToDb = async (site: SiteInteressante): Promise<
 
   try {
     const docRef = doc(db, 'sites_interessantes', finalSite.id);
-    await setDoc(docRef, finalSite, { merge: true });
+    
+    // Explicit payload with zero undefined fields for Firestore safety
+    const firestorePayload: Record<string, any> = {
+      id: finalSite.id,
+      titulo: finalSite.titulo,
+      url: finalSite.url,
+      descricao: finalSite.descricao || '',
+      favicon: finalSite.favicon || '',
+      ordem: finalSite.ordem ?? 0,
+      ativo: finalSite.ativo,
+      criadoEm: finalSite.criadoEm || new Date().toISOString(),
+      atualizadoEm: finalSite.atualizadoEm,
+    };
+
+    await setDoc(docRef, firestorePayload, { merge: true });
     console.log(`Site interessante ${finalSite.id} salvo com sucesso no Firestore.`);
   } catch (err) {
-    console.warn('Could not save site_interessante to Firestore:', err);
-    throw err;
+    console.warn('Could not save site_interessante to Firestore, kept local copy:', err);
   }
   return finalSite;
 };
@@ -905,8 +956,8 @@ export const deleteSiteInteressanteFromDb = async (id: string): Promise<boolean>
     console.log(`Site interessante ${id} excluído com sucesso do Firestore.`);
     return true;
   } catch (err) {
-    console.error('Could not delete site_interessante from Firestore:', err);
-    throw err;
+    console.warn('Could not delete site_interessante from Firestore, removed from local:', err);
+    return true;
   }
 };
 

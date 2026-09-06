@@ -2276,38 +2276,71 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   {sites.length} {sites.length === 1 ? 'Site Cadastrado' : 'Sites Cadastrados'}
                 </div>
                 <div className="grid grid-cols-1 gap-3">
-                  {sites.map((site) => (
+                  {sites.map((site) => {
+                    const faviconSrc = site.favicon || (site.url ? `https://www.google.com/s2/favicons?domain=${new URL(site.url.startsWith('http') ? site.url : `https://${site.url}`).hostname.replace(/^www\./i, '')}&sz=64` : '');
+                    
+                    return (
                     <div
                       key={site.id}
                       className="p-5 bg-zinc-950 border border-zinc-850 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors hover:border-zinc-700"
                     >
-                      <div className="space-y-1.5 min-w-0">
-                        <div className="flex items-center gap-2.5">
-                          <h4 className="font-serif font-bold text-base text-white truncate">
-                            {site.titulo}
-                          </h4>
-                          <span className={`px-2 py-0.5 text-[10px] uppercase font-mono tracking-wider border ${
-                            site.ativo 
-                              ? 'border-emerald-800 text-emerald-400 bg-emerald-950/40' 
-                              : 'border-zinc-800 text-zinc-500 bg-zinc-900'
-                          }`}>
-                            {site.ativo ? 'Ativo' : 'Oculto'}
-                          </span>
+                      <div className="flex items-start gap-4 min-w-0">
+                        {/* Favicon Icon */}
+                        <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 mt-0.5 overflow-hidden p-1">
+                          {faviconSrc ? (
+                            <img
+                              src={faviconSrc}
+                              alt=""
+                              className="w-5 h-5 object-contain rounded-sm"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent && !parent.querySelector('svg')) {
+                                  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                                  svg.setAttribute('class', 'w-4 h-4 text-zinc-500');
+                                  svg.setAttribute('viewBox', '0 0 24 24');
+                                  svg.setAttribute('fill', 'none');
+                                  svg.setAttribute('stroke', 'currentColor');
+                                  svg.setAttribute('stroke-width', '2');
+                                  svg.innerHTML = '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>';
+                                  parent.appendChild(svg);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <Globe className="w-4 h-4 text-zinc-500" />
+                          )}
                         </div>
-                        {site.descricao && (
-                          <p className="text-xs text-zinc-400 line-clamp-1">
-                            {site.descricao}
-                          </p>
-                        )}
-                        <a
-                          href={site.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-white truncate transition-colors"
-                        >
-                          <ExternalLink className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{site.url}</span>
-                        </a>
+
+                        <div className="space-y-1.5 min-w-0">
+                          <div className="flex items-center gap-2.5">
+                            <h4 className="font-serif font-bold text-base text-white truncate">
+                              {site.titulo}
+                            </h4>
+                            <span className={`px-2 py-0.5 text-[10px] uppercase font-mono tracking-wider border ${
+                              site.ativo 
+                                ? 'border-emerald-800 text-emerald-400 bg-emerald-950/40' 
+                                : 'border-zinc-800 text-zinc-500 bg-zinc-900'
+                            }`}>
+                              {site.ativo ? 'Ativo' : 'Oculto'}
+                            </span>
+                          </div>
+                          {site.descricao && (
+                            <p className="text-xs text-zinc-400 line-clamp-1">
+                              {site.descricao}
+                            </p>
+                          )}
+                          <a
+                            href={site.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-white truncate transition-colors"
+                          >
+                            <ExternalLink className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{site.url}</span>
+                          </a>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
@@ -2333,7 +2366,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                         </button>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               </div>
             )}
