@@ -86,6 +86,15 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, paginas = [] }) => {
                   </button>
                 </li>
               ))}
+              <li>
+                <button 
+                  id="footer-link-sitemap"
+                  onClick={() => { onNavigate('/sitemap.xml'); scrollToTop(); }} 
+                  className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer text-[11px]"
+                >
+                  Sitemap (XML)
+                </button>
+              </li>
             </ul>
           </div>
 

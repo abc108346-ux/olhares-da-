@@ -52,8 +52,10 @@ import {
   CheckCheck,
   FileCode2,
   Compass,
-  ArrowUpRight
+  ArrowUpRight,
+  Globe
 } from 'lucide-react';
+import { generateSitemapXml, downloadSitemapXmlFile } from '../utils/sitemap';
 
 interface AdminDashboardPageProps {
   currentUser: UserProfile;
@@ -2241,6 +2243,49 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   A contagem é protegida por filtro de dispositivo único: visitas repetidas e atualizações de página pelo mesmo aparelho não aumentam a métrica.
                 </p>
               </form>
+            </div>
+
+            {/* Sitemap.xml & SEO Tool */}
+            <div className="bg-zinc-950 border border-zinc-800 p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <Globe className="w-4 h-4 text-zinc-300" />
+                  <h3 className="font-serif text-sm font-bold text-white uppercase tracking-wider">
+                    Sitemap.xml & Indexação SEO
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-500 uppercase">
+                  Google Search Console
+                </span>
+              </div>
+
+              <p className="text-xs text-zinc-400 font-light leading-relaxed">
+                O arquivo <code className="text-zinc-200 font-mono bg-zinc-900 px-1.5 py-0.5 border border-zinc-800">sitemap.xml</code> informa aos motores de busca (Google, Bing) todas as páginas, críticas e rotas catalogadas em Olhares da Cena.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const xml = generateSitemapXml(criticas, paginas);
+                    downloadSitemapXmlFile(xml);
+                    showNotification('sitemap.xml gerado e baixado com sucesso!');
+                  }}
+                  className="px-4 py-2 bg-white text-black font-mono font-semibold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <FileCode2 className="w-3.5 h-3.5" />
+                  <span>Baixar sitemap.xml Atualizado</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onNavigate('/sitemap.xml')}
+                  className="px-4 py-2 bg-zinc-900 text-white border border-zinc-700 font-mono uppercase tracking-wider text-xs hover:bg-zinc-800 transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Abrir Visualizador do Sitemap</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

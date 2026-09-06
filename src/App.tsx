@@ -23,6 +23,7 @@ import { PaginaDetailPage } from './pages/PaginaDetailPage';
 import { PesquisaPage } from './pages/PesquisaPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
+import { SitemapPage } from './pages/SitemapPage';
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState<string>(() => {
@@ -191,6 +192,17 @@ export default function App() {
           criticas={criticas}
           initialQuery={initialSearchQuery}
           onSelectCritica={(slug) => navigateTo(`/criticas/${slug}`)}
+        />
+      );
+    }
+
+    // Sitemap XML Page
+    if (cleanPath === '/sitemap.xml' || cleanPath === '/sitemap') {
+      return (
+        <SitemapPage
+          criticas={criticas}
+          paginas={paginas}
+          onNavigate={navigateTo}
         />
       );
     }
