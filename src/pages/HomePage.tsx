@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Sparkles, BookOpen, Compass, Search } from 'lucide-react';
+import { ArrowRight, Sparkles, Search } from 'lucide-react';
 import { Critica, HomeSettings } from '../types';
-import { Logo } from '../components/Logo';
 import { CriticaCard } from '../components/CriticaCard';
 import { SearchBar } from '../components/SearchBar';
 import { SiteViewsCounter } from '../components/SiteViewsCounter';
@@ -45,14 +44,16 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
     fetchSettings();
   }, []);
 
-  // Filter published only for public viewing
-  const publishedCriticas = criticas.filter(c => c.publicada);
+  // Filter published only for public viewing, ordered by publication date descending
+  const publishedCriticas = criticas
+    .filter(c => c.publicada)
+    .sort((a, b) => new Date(b.dataPublicacao).getTime() - new Date(a.dataPublicacao).getTime());
   
-  // Featured / Lead critique
+  // Featured / Lead critique (explicit destaque or the latest launched)
   const featured = publishedCriticas.find(c => c.destaque) || publishedCriticas[0];
   
-  // Recent 6 critiques (excluding or including featured)
-  const recentCriticas = publishedCriticas.slice(0, 6);
+  // Recent critiques (excluding featured lead to avoid immediate duplicate)
+  const recentCriticas = publishedCriticas.filter(c => c.id !== featured?.id).slice(0, 6);
 
   const handleSearchSubmit = (term: string) => {
     if (term.trim()) {
@@ -64,7 +65,7 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
     <div id="home-page" className="min-h-screen bg-black text-white space-y-12 sm:space-y-16 pb-20">
       
       {/* =========================================================================
-          1. HERO SECTION (Proper sizing and aspect ratio)
+          0. IMAGEM INICIAL (Mantida intacta sem alterações conforme solicitado)
          ========================================================================= */}
       <section id="hero-section" className="w-full border-b border-zinc-900 bg-black pt-2 pb-6 sm:py-8">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -81,57 +82,28 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
       </section>
 
       {/* =========================================================================
-          2. SEARCH BAR SECTION (Acervo Search)
+          1. FRASE OLHARES DA CENA
          ========================================================================= */}
-      <section id="home-search-section" className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="p-6 sm:p-8 bg-zinc-950 border border-zinc-850 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-900 pb-3">
-            <h2 className="font-display uppercase tracking-[0.2em] text-xs font-semibold text-white flex items-center gap-2">
-              <Search className="w-3.5 h-3.5 text-zinc-400" />
-              Pesquisar no Acervo Crítico
-            </h2>
-            <span className="text-[11px] font-mono text-zinc-500">
-              {publishedCriticas.length} {publishedCriticas.length === 1 ? 'crítica catalogada' : 'críticas catalogadas'}
-            </span>
+      <section id="home-manifesto-banner" className="border-y border-zinc-900 bg-zinc-950 py-12 sm:py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-5 sm:space-y-6">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 border border-white rotate-45 mx-auto flex items-center justify-center mb-1">
+            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white" />
           </div>
 
-          <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSearchSubmit(searchTerm);
-            }}
-            className="space-y-3"
-          >
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="flex-1">
-                <SearchBar
-                  value={searchTerm}
-                  onChange={setSearchTerm}
-                  placeholder="Pesquisar críticas por título, espetáculo, ator, autor, cidade..."
-                />
-              </div>
-              <button
-                type="submit"
-                id="home-submit-search"
-                className="px-6 py-3 bg-white text-black font-semibold uppercase tracking-[0.18em] text-xs hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 cursor-pointer sm:self-start"
-              >
-                <span>PESQUISAR</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </form>
+          <blockquote className="font-serif italic text-lg sm:text-2xl lg:text-3xl text-zinc-200 leading-relaxed font-light whitespace-pre-wrap">
+            “{homeSettings.manifestoText}”
+          </blockquote>
+
+          <div className="pt-1 sm:pt-2">
+            <p className="text-xs uppercase tracking-[0.25em] text-zinc-500 font-mono">
+              {homeSettings.manifestoCaption}
+            </p>
+          </div>
         </div>
       </section>
 
       {/* =========================================================================
-          2.5. TOTAL SITE VIEWS COUNTER (Contador Total de Visualizações do Site)
-         ========================================================================= */}
-      <section id="home-views-counter-section" className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SiteViewsCounter />
-      </section>
-
-      {/* =========================================================================
-          3. FEATURED EDITORIAL CRITIQUE OR EMPTY STATE
+          2. ÚLTIMA CRÍTICA LANÇADA (CRÍTICA EM DESTAQUE)
          ========================================================================= */}
       {featured ? (
         <section id="home-featured-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -139,7 +111,7 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
             <div className="flex items-center justify-between border-b border-zinc-850 pb-3">
               <h2 className="font-display tracking-[0.25em] text-white font-bold text-xs sm:text-sm uppercase flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-zinc-400" />
-                CRÍTICA EM DESTAQUE
+                ÚLTIMA CRÍTICA LANÇADA • DESTAQUE
               </h2>
               <span className="text-[11px] uppercase tracking-wider font-mono text-zinc-500">
                 EDIÇÃO ATUAL
@@ -156,15 +128,15 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
       ) : null}
 
       {/* =========================================================================
-          4. RECENT CRITIQUES SECTION
+          3. CRÍTICAS RECENTES
          ========================================================================= */}
-      {publishedCriticas.length > 0 ? (
+      {recentCriticas.length > 0 ? (
         <section id="home-recent-criticas-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
           {/* Header with Title and "Ver Todas" link */}
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-zinc-850 pb-4">
             <div>
               <span className="text-[10px] uppercase tracking-[0.3em] font-mono text-zinc-500 block mb-1">
-                PUBLICAÇÕES MAIS RECENTES
+                PUBLICAÇÕES RECENTES
               </span>
               <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-white uppercase tracking-tight">
                 Críticas Recentes
@@ -204,8 +176,8 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
             </button>
           </div>
         </section>
-      ) : (
-        /* Clean Editorial Empty State when 0 critiques exist */
+      ) : (!featured ? (
+        /* Empty State if absolutely 0 critiques */
         <section id="home-empty-state-section" className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="p-10 sm:p-14 border border-zinc-850 bg-zinc-950 text-center space-y-4">
             <div className="w-6 h-6 border border-zinc-600 rotate-45 mx-auto flex items-center justify-center mb-1">
@@ -219,27 +191,56 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
             </p>
           </div>
         </section>
-      )}
+      ) : null)}
 
       {/* =========================================================================
-          5. EDITORIAL MANIFESTO / QUOTE BANNER
+          4. BARRA DE PESQUISA (Acervo Search)
          ========================================================================= */}
-      <section id="home-manifesto-banner" className="border-y border-zinc-900 bg-zinc-950 py-16 sm:py-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-6">
-          <div className="w-8 h-8 border border-white rotate-45 mx-auto flex items-center justify-center mb-2">
-            <div className="w-2 h-2 bg-white" />
+      <section id="home-search-section" className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="p-6 sm:p-8 bg-zinc-950 border border-zinc-850 space-y-4 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-900 pb-3">
+            <h2 className="font-display uppercase tracking-[0.2em] text-xs font-semibold text-white flex items-center gap-2">
+              <Search className="w-3.5 h-3.5 text-zinc-400" />
+              Pesquisar no Acervo Crítico
+            </h2>
+            <span className="text-[11px] font-mono text-zinc-500">
+              {publishedCriticas.length} {publishedCriticas.length === 1 ? 'crítica catalogada' : 'críticas catalogadas'}
+            </span>
           </div>
 
-          <blockquote className="font-serif italic text-xl sm:text-2xl lg:text-3xl text-zinc-200 leading-relaxed font-light whitespace-pre-wrap">
-            “{homeSettings.manifestoText}”
-          </blockquote>
-
-          <div className="pt-2">
-            <p className="text-xs uppercase tracking-[0.25em] text-zinc-500 font-mono">
-              {homeSettings.manifestoCaption}
-            </p>
-          </div>
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSearchSubmit(searchTerm);
+            }}
+            className="space-y-3"
+          >
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex-1">
+                <SearchBar
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                  placeholder="Pesquisar críticas por título, espetáculo, ator, autor, cidade..."
+                />
+              </div>
+              <button
+                type="submit"
+                id="home-submit-search"
+                className="px-6 py-3 bg-white text-black font-semibold uppercase tracking-[0.18em] text-xs hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 cursor-pointer sm:self-start"
+              >
+                <span>PESQUISAR</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </form>
         </div>
+      </section>
+
+      {/* =========================================================================
+          5. TOTAL DE VIEWS (Contador Oficial de Visualizações)
+         ========================================================================= */}
+      <section id="home-views-counter-section" className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SiteViewsCounter />
       </section>
 
     </div>
