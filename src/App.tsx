@@ -4,15 +4,17 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Critica, UserProfile, Pagina } from './types';
+import { Critica, UserProfile, Pagina, SiteInteressante } from './types';
 import { 
   fetchAllCriticas, 
   fetchAllPaginas,
   subscribeToAuth, 
   subscribeToCriticas,
   subscribeToPaginas,
+  subscribeToSitesInteressantes,
   getLocalCriticas,
-  getLocalPaginas
+  getLocalPaginas,
+  getLocalSitesInteressantes
 } from './services/firebase';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -31,6 +33,7 @@ export default function App() {
   });
   const [criticas, setCriticas] = useState<Critica[]>(() => getLocalCriticas());
   const [paginas, setPaginas] = useState<Pagina[]>(() => getLocalPaginas());
+  const [sitesInteressantes, setSitesInteressantes] = useState<SiteInteressante[]>(() => getLocalSitesInteressantes());
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -87,11 +90,19 @@ export default function App() {
       }
     });
 
+    // 4. Real-time subscription to Sites Interessantes
+    const unsubSites = subscribeToSitesInteressantes((sitesData) => {
+      if (isMounted && sitesData) {
+        setSitesInteressantes(sitesData);
+      }
+    });
+
     return () => {
       isMounted = false;
       if (unsubAuth) unsubAuth();
       if (unsubCriticas) unsubCriticas();
       if (unsubPaginas) unsubPaginas();
+      if (unsubSites) unsubSites();
     };
   }, []);
 
@@ -125,8 +136,10 @@ export default function App() {
           currentUser={currentUser}
           criticas={criticas}
           paginas={paginas}
+          sitesInteressantes={sitesInteressantes}
           onCriticasChange={(updated) => setCriticas(updated)}
           onPaginasChange={(updated) => setPaginas(updated)}
+          onSitesChange={(updated) => setSitesInteressantes(updated)}
           onNavigate={navigateTo}
           onSelectCritica={(slug) => navigateTo(`/criticas/${slug}`)}
         />
@@ -152,6 +165,7 @@ export default function App() {
           <CriticaDetailPage
             critica={selectedCritica}
             allCriticas={criticas}
+            sitesInteressantes={sitesInteressantes}
             onNavigate={navigateTo}
             onSelectCritica={(slug) => navigateTo(`/criticas/${slug}`)}
           />
@@ -180,6 +194,7 @@ export default function App() {
       return (
         <CriticasPage
           criticas={criticas}
+          sitesInteressantes={sitesInteressantes}
           onSelectCritica={(slug) => navigateTo(`/criticas/${slug}`)}
         />
       );

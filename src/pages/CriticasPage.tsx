@@ -1,17 +1,20 @@
 import React, { useState, useMemo } from 'react';
-import { Critica, CategoriaTipo } from '../types';
+import { Critica, CategoriaTipo, SiteInteressante } from '../types';
 import { CriticaCard } from '../components/CriticaCard';
 import { SearchBar } from '../components/SearchBar';
+import { SitesInteressantesSection } from '../components/SitesInteressantesSection';
 import { Filter, Calendar, Layers, SlidersHorizontal, RefreshCw } from 'lucide-react';
 
 interface CriticasPageProps {
   criticas: Critica[];
+  sitesInteressantes?: SiteInteressante[];
   onSelectCritica: (slug: string) => void;
   initialCategory?: string;
 }
 
 export const CriticasPage: React.FC<CriticasPageProps> = ({ 
   criticas, 
+  sitesInteressantes = [],
   onSelectCritica,
   initialCategory = 'Todas'
 }) => {
@@ -150,49 +153,61 @@ export const CriticasPage: React.FC<CriticasPageProps> = ({
           </div>
         </div>
 
-        {/* Results Grid */}
-        {filteredCriticas.length > 0 ? (
-          <div className="space-y-12">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-              {visibleCriticas.map((critica) => (
-                <CriticaCard
-                  key={critica.id}
-                  critica={critica}
-                  onSelect={onSelectCritica}
-                />
-              ))}
-            </div>
+        {/* Main Content Area & Aside */}
+        <div className="flex flex-col lg:flex-row lg:items-start lg:gap-8 xl:gap-10">
+          
+          {/* Main Column: Critiques Cards */}
+          <div className="flex-1 min-w-0">
+            {filteredCriticas.length > 0 ? (
+              <div className="space-y-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6 lg:gap-8">
+                  {visibleCriticas.map((critica) => (
+                    <CriticaCard
+                      key={critica.id}
+                      critica={critica}
+                      onSelect={onSelectCritica}
+                    />
+                  ))}
+                </div>
 
-            {/* Progressive Loading Button */}
-            {hasMore && (
-              <div className="text-center pt-6">
+                {/* Progressive Loading Button */}
+                {hasMore && (
+                  <div className="text-center pt-6">
+                    <button
+                      id="load-more-criticas-btn"
+                      onClick={() => setItemsPerPage(prev => prev + 6)}
+                      className="px-8 py-3.5 bg-zinc-950 hover:bg-white text-white hover:text-black border border-zinc-800 hover:border-white font-semibold uppercase tracking-[0.2em] text-xs transition-all duration-200 cursor-pointer"
+                    >
+                      CARREGAR MAIS CRÍTICAS ({filteredCriticas.length - itemsPerPage} restantes)
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-16 border border-zinc-900 bg-zinc-950 text-center space-y-4">
+                <Layers className="w-10 h-10 text-zinc-600 mx-auto" />
+                <h3 className="font-serif text-2xl text-white font-bold uppercase">
+                  Nenhuma crítica encontrada
+                </h3>
+                <p className="text-zinc-400 text-sm max-w-md mx-auto font-light">
+                  Nenhum texto corresponde aos filtros selecionados. Experimente buscar por outros termos ou limpar os filtros.
+                </p>
                 <button
-                  id="load-more-criticas-btn"
-                  onClick={() => setItemsPerPage(prev => prev + 6)}
-                  className="px-8 py-3.5 bg-zinc-950 hover:bg-white text-white hover:text-black border border-zinc-800 hover:border-white font-semibold uppercase tracking-[0.2em] text-xs transition-all duration-200 cursor-pointer"
+                  onClick={handleResetFilters}
+                  className="mt-4 px-6 py-2.5 bg-white text-black font-semibold uppercase tracking-wider text-xs hover:bg-zinc-200 cursor-pointer"
                 >
-                  CARREGAR MAIS CRÍTICAS ({filteredCriticas.length - itemsPerPage} restantes)
+                  Ver Todas as Críticas
                 </button>
               </div>
             )}
           </div>
-        ) : (
-          <div className="p-16 border border-zinc-900 bg-zinc-950 text-center space-y-4">
-            <Layers className="w-10 h-10 text-zinc-600 mx-auto" />
-            <h3 className="font-serif text-2xl text-white font-bold uppercase">
-              Nenhuma crítica encontrada
-            </h3>
-            <p className="text-zinc-400 text-sm max-w-md mx-auto font-light">
-              Nenhum texto corresponde aos filtros selecionados. Experimente buscar por outros termos ou limpar os filtros.
-            </p>
-            <button
-              onClick={handleResetFilters}
-              className="mt-4 px-6 py-2.5 bg-white text-black font-semibold uppercase tracking-wider text-xs hover:bg-zinc-200 cursor-pointer"
-            >
-              Ver Todas as Críticas
-            </button>
-          </div>
-        )}
+
+          {/* Lateral Column: Sites Interessantes (Desktop: side / Mobile: bottom) */}
+          <aside className="w-full lg:w-72 xl:w-80 shrink-0 mt-12 lg:mt-0 lg:sticky lg:top-24">
+            <SitesInteressantesSection sites={sitesInteressantes} />
+          </aside>
+
+        </div>
 
       </div>
     </div>

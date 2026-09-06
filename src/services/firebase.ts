@@ -29,7 +29,7 @@ import {
   browserSessionPersistence,
   User 
 } from 'firebase/auth';
-import { Critica, UserProfile, Pagina, HomeSettings, SiteStats } from '../types';
+import { Critica, UserProfile, Pagina, HomeSettings, SiteStats, SiteInteressante } from '../types';
 import { INITIAL_CRITICAS } from '../data/initialCriticas';
 
 import firebaseConfigJson from '../../firebase-applet-config.json';
@@ -39,6 +39,7 @@ const STORAGE_KEY = 'olhares_da_cena_criticas_v2';
 const PAGINAS_STORAGE_KEY = 'olhares_da_cena_paginas';
 const ADMIN_SESSION_KEY = 'olhares_da_cena_admin_session';
 const SITE_STATS_STORAGE_KEY = 'olhares_da_cena_site_stats';
+const SITES_INTERESSANTES_STORAGE_KEY = 'olhares_da_cena_sites_interessantes';
 
 const viteEnv = (import.meta as any).env || {};
 
@@ -776,3 +777,136 @@ export const logoutAdminUser = async () => {
     // ignore
   }
 };
+
+// ==========================================
+// SITES INTERESSANTES (Links recomendados)
+// ==========================================
+
+export const getLocalSitesInteressantes = (): SiteInteressante[] => {
+  try {
+    const cached = localStorage.getItem(SITES_INTERESSANTES_STORAGE_KEY);
+    if (cached !== null) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not read sites_interessantes from localStorage:', e);
+  }
+  // User requested: "e nao adiciona nenhum link ainda" - starts completely empty
+  return [];
+};
+
+export const setLocalSitesInteressantes = (items: SiteInteressante[]) => {
+  try {
+    localStorage.setItem(SITES_INTERESSANTES_STORAGE_KEY, JSON.stringify(items));
+  } catch (e) {
+    console.warn('Could not save sites_interessantes to localStorage:', e);
+  }
+};
+
+export const fetchSitesInteressantes = async (onlyActive = true): Promise<SiteInteressante[]> => {
+  try {
+    const sitesRef = collection(db, 'sites_interessantes');
+    const q = onlyActive 
+      ? query(sitesRef, where('ativo', '==', true))
+      : query(sitesRef);
+    const snapshot = await getDocs(q);
+    const list: SiteInteressante[] = [];
+    snapshot.forEach(docSnap => {
+      list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+    });
+    // Sort by order ascending
+    list.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+    setLocalSitesInteressantes(list);
+    return list;
+  } catch (err) {
+    if ((err as any)?.code !== 'unavailable') {
+      console.warn('Could not fetch sites_interessantes from Firestore, using local cache:', err);
+    }
+    const local = getLocalSitesInteressantes();
+    if (onlyActive) {
+      return local.filter(s => s.ativo);
+    }
+    return local;
+  }
+};
+
+export const subscribeToSitesInteressantes = (
+  callback: (sites: SiteInteressante[]) => void,
+  onlyActive = false
+): (() => void) => {
+  try {
+    const sitesRef = collection(db, 'sites_interessantes');
+    const q = onlyActive 
+      ? query(sitesRef, where('ativo', '==', true))
+      : query(sitesRef);
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const list: SiteInteressante[] = [];
+        snapshot.forEach(docSnap => {
+          list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+        });
+        list.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+        setLocalSitesInteressantes(list);
+        callback(list);
+      },
+      (error) => {
+        console.warn('Firestore onSnapshot error on sites_interessantes:', error);
+        const local = getLocalSitesInteressantes();
+        callback(onlyActive ? local.filter(s => s.ativo) : local);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Could not establish real-time subscription for sites_interessantes:', err);
+    const local = getLocalSitesInteressantes();
+    callback(onlyActive ? local.filter(s => s.ativo) : local);
+    return () => {};
+  }
+};
+
+export const saveSiteInteressanteToDb = async (site: SiteInteressante): Promise<SiteInteressante> => {
+  const finalSite: SiteInteressante = {
+    ...site,
+    atualizadoEm: new Date().toISOString(),
+  };
+
+  const local = getLocalSitesInteressantes();
+  const index = local.findIndex(s => s.id === finalSite.id);
+  if (index >= 0) {
+    local[index] = finalSite;
+  } else {
+    local.push(finalSite);
+  }
+  setLocalSitesInteressantes(local);
+
+  try {
+    const docRef = doc(db, 'sites_interessantes', finalSite.id);
+    await setDoc(docRef, finalSite, { merge: true });
+    console.log(`Site interessante ${finalSite.id} salvo com sucesso no Firestore.`);
+  } catch (err) {
+    console.warn('Could not save site_interessante to Firestore:', err);
+    throw err;
+  }
+  return finalSite;
+};
+
+export const deleteSiteInteressanteFromDb = async (id: string): Promise<boolean> => {
+  const local = getLocalSitesInteressantes().filter(s => s.id !== id);
+  setLocalSitesInteressantes(local);
+
+  try {
+    const docRef = doc(db, 'sites_interessantes', id);
+    await deleteDoc(docRef);
+    console.log(`Site interessante ${id} excluído com sucesso do Firestore.`);
+    return true;
+  } catch (err) {
+    console.error('Could not delete site_interessante from Firestore:', err);
+    throw err;
+  }
+};
+

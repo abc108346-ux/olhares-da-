@@ -36,6 +36,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Sites Interessantes collection
+    match /sites_interessantes/{siteId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Fallback default
     match /{document=**} {
       allow read, write: if true;

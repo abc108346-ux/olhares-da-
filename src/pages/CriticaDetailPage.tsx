@@ -1,15 +1,17 @@
 import React, { useEffect } from 'react';
-import { Critica } from '../types';
+import { Critica, SiteInteressante } from '../types';
 import { formatDateBr } from '../components/CriticaCard';
 import { FichaTecnica } from '../components/FichaTecnica';
 import { RichContentRenderer } from '../components/RichContentRenderer';
 import { ShareButtons } from '../components/ShareButtons';
 import { CriticaCard } from '../components/CriticaCard';
+import { SitesInteressantesSection } from '../components/SitesInteressantesSection';
 import { ArrowLeft, Calendar, User, MapPin, Tag, Share2, Compass, Layers } from 'lucide-react';
 
 interface CriticaDetailPageProps {
   critica: Critica;
   allCriticas: Critica[];
+  sitesInteressantes?: SiteInteressante[];
   onNavigate: (path: string) => void;
   onSelectCritica: (slug: string) => void;
 }
@@ -17,6 +19,7 @@ interface CriticaDetailPageProps {
 export const CriticaDetailPage: React.FC<CriticaDetailPageProps> = ({
   critica,
   allCriticas,
+  sitesInteressantes = [],
   onNavigate,
   onSelectCritica,
 }) => {
@@ -131,70 +134,80 @@ export const CriticaDetailPage: React.FC<CriticaDetailPageProps> = ({
         </figure>
       )}
 
-      {/* Article Body Content */}
-      <section className="max-w-3xl mx-auto px-4 sm:px-6 w-full overflow-x-hidden">
-        
-        {/* Full Rich Markdown / HTML content */}
-        <RichContentRenderer content={critica.conteudo} />
+      {/* Article Body Content & Lateral Aside */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:gap-12 xl:gap-16">
+          
+          {/* Main Reading Column */}
+          <section className="w-full lg:flex-1 min-w-0 overflow-x-hidden">
+            {/* Full Rich Markdown / HTML content */}
+            <RichContentRenderer content={critica.conteudo} />
 
-        {/* Ficha Técnica */}
-        <FichaTecnica
-          ficha={critica.fichaTecnica}
-          nomeEspetaculo={critica.nomeEspetaculo}
-          companhia={critica.companhia}
-          cidade={critica.cidade}
-          estado={critica.estado}
-        />
+            {/* Ficha Técnica */}
+            <FichaTecnica
+              ficha={critica.fichaTecnica}
+              nomeEspetaculo={critica.nomeEspetaculo}
+              companhia={critica.companhia}
+              cidade={critica.cidade}
+              estado={critica.estado}
+            />
 
-        {/* Additional Images Gallery if any */}
-        {critica.imagens && critica.imagens.length > 0 && (
-          <div className="my-12 space-y-4">
-            <h4 className="text-xs uppercase font-mono tracking-[0.25em] text-zinc-400 border-b border-zinc-900 pb-2 text-center sm:text-left">
-              GALERIA DE CENA
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {critica.imagens.map((imgUrl, i) => (
-                <div key={i} className="border border-zinc-850 overflow-hidden bg-black">
-                  <img
-                    src={imgUrl}
-                    alt={`Cena adicional ${i + 1}`}
-                    loading="lazy"
-                    className="w-full h-56 object-cover grayscale hover:grayscale-0 transition-all duration-500"
-                  />
+            {/* Additional Images Gallery if any */}
+            {critica.imagens && critica.imagens.length > 0 && (
+              <div className="my-12 space-y-4">
+                <h4 className="text-xs uppercase font-mono tracking-[0.25em] text-zinc-400 border-b border-zinc-900 pb-2 text-center sm:text-left">
+                  GALERIA DE CENA
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {critica.imagens.map((imgUrl, i) => (
+                    <div key={i} className="border border-zinc-850 overflow-hidden bg-black">
+                      <img
+                        src={imgUrl}
+                        alt={`Cena adicional ${i + 1}`}
+                        loading="lazy"
+                        className="w-full h-56 object-cover grayscale hover:grayscale-0 transition-all duration-500"
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* Tags Section */}
+            {critica.tags && critica.tags.length > 0 && (
+              <div className="my-8 pt-6 border-t border-zinc-900 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <span className="text-xs uppercase font-mono text-zinc-500 mr-2 flex items-center gap-1">
+                  <Tag className="w-3.5 h-3.5" />
+                  TAGS:
+                </span>
+                {critica.tags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => onNavigate(`/pesquisa?q=${encodeURIComponent(tag)}`)}
+                    className="px-2.5 py-1 bg-zinc-950 hover:bg-white text-zinc-400 hover:text-black border border-zinc-800 hover:border-white text-xs font-mono lowercase transition-colors cursor-pointer"
+                  >
+                    #{tag.replace(/^#/, '')}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Share Bar */}
+            <div className="my-8 p-4 bg-zinc-950 border border-zinc-850 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-xs font-serif italic text-zinc-300 text-center sm:text-left">
+                Apreciou esta reflexão sobre a cena? Compartilhe com a comunidade teatral.
+              </div>
+              <ShareButtons titulo={critica.titulo} />
             </div>
-          </div>
-        )}
+          </section>
 
-        {/* Tags Section */}
-        {critica.tags && critica.tags.length > 0 && (
-          <div className="my-8 pt-6 border-t border-zinc-900 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-            <span className="text-xs uppercase font-mono text-zinc-500 mr-2 flex items-center gap-1">
-              <Tag className="w-3.5 h-3.5" />
-              TAGS:
-            </span>
-            {critica.tags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => onNavigate(`/pesquisa?q=${encodeURIComponent(tag)}`)}
-                className="px-2.5 py-1 bg-zinc-950 hover:bg-white text-zinc-400 hover:text-black border border-zinc-800 hover:border-white text-xs font-mono lowercase transition-colors cursor-pointer"
-              >
-                #{tag.replace(/^#/, '')}
-              </button>
-            ))}
-          </div>
-        )}
+          {/* Lateral Column: Sites Interessantes (Desktop: side / Mobile: bottom of the page) */}
+          <aside className="w-full lg:w-72 xl:w-80 shrink-0 mt-12 lg:mt-0 lg:sticky lg:top-24">
+            <SitesInteressantesSection sites={sitesInteressantes} />
+          </aside>
 
-        {/* Share Bar */}
-        <div className="my-8 p-4 bg-zinc-950 border border-zinc-850 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-xs font-serif italic text-zinc-300 text-center sm:text-left">
-            Apreciou esta reflexão sobre a cena? Compartilhe com a comunidade teatral.
-          </div>
-          <ShareButtons titulo={critica.titulo} />
         </div>
-
-      </section>
+      </div>
 
       {/* Related 3 Critiques Section ("OUTRAS CRÍTICAS") */}
       {relatedCriticas.length > 0 && (

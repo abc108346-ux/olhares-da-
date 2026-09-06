@@ -93,3 +93,15 @@ export interface SearchFilterState {
   ano: string;
   tag: string;
 }
+
+export interface SiteInteressante {
+  id: string;
+  titulo: string;
+  url: string;
+  descricao?: string;
+  ordem?: number;
+  ativo: boolean;
+  criadoEm?: string;
+  atualizadoEm?: string;
+}
+

@@ -5,13 +5,16 @@ import {
   CategoriaTipo, 
   FichaTecnica as FichaTecnicaType,
   Pagina,
-  SiteStats
+  SiteStats,
+  SiteInteressante
 } from '../types';
 import { 
   saveCriticaToDb, 
   deleteCriticaFromDb, 
   savePaginaToDb,
   deletePaginaFromDb,
+  saveSiteInteressanteToDb,
+  deleteSiteInteressanteFromDb,
   seedDatabaseIfEmpty, 
   logoutAdminUser,
   getHomeSettings,
@@ -61,13 +64,15 @@ interface AdminDashboardPageProps {
   currentUser: UserProfile;
   criticas: Critica[];
   paginas?: Pagina[];
+  sitesInteressantes?: SiteInteressante[];
   onCriticasChange: (criticas: Critica[]) => void;
   onPaginasChange?: (paginas: Pagina[]) => void;
+  onSitesChange?: (sites: SiteInteressante[]) => void;
   onNavigate: (path: string) => void;
   onSelectCritica: (slug: string) => void;
 }
 
-type AdminView = 'dashboard' | 'criticas' | 'nova-critica' | 'editar-critica' | 'paginas' | 'nova-pagina' | 'editar-pagina' | 'categorias' | 'midia' | 'configuracoes' | 'home-settings';
+type AdminView = 'dashboard' | 'criticas' | 'nova-critica' | 'editar-critica' | 'paginas' | 'nova-pagina' | 'editar-pagina' | 'categorias' | 'sites-interessantes' | 'midia' | 'configuracoes' | 'home-settings';
 
 const CATEGORIAS_PADRAO: CategoriaTipo[] = [
   'Teatro',
@@ -93,8 +98,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   currentUser,
   criticas,
   paginas = [],
+  sitesInteressantes = [],
   onCriticasChange,
   onPaginasChange,
+  onSitesChange,
   onNavigate,
   onSelectCritica,
 }) => {
@@ -635,6 +642,139 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
     }
   };
 
+  // Sites Interessantes State & Handlers
+  const [sites, setSites] = useState<SiteInteressante[]>(() => sitesInteressantes || []);
+
+  useEffect(() => {
+    if (sitesInteressantes) {
+      setSites(sitesInteressantes);
+    }
+  }, [sitesInteressantes]);
+
+  const [siteFormOpen, setSiteFormOpen] = useState(false);
+  const [editingSiteId, setEditingSiteId] = useState<string | null>(null);
+  const [siteFormData, setSiteFormData] = useState<{
+    titulo: string;
+    url: string;
+    descricao: string;
+    ordem: number;
+    ativo: boolean;
+  }>({
+    titulo: '',
+    url: '',
+    descricao: '',
+    ordem: 0,
+    ativo: true,
+  });
+
+  const [deleteSiteModalOpen, setDeleteSiteModalOpen] = useState(false);
+  const [siteToDelete, setSiteToDelete] = useState<SiteInteressante | null>(null);
+
+  const handleOpenNewSite = () => {
+    setEditingSiteId(null);
+    setSiteFormData({
+      titulo: '',
+      url: '',
+      descricao: '',
+      ordem: sites.length,
+      ativo: true,
+    });
+    setSiteFormOpen(true);
+  };
+
+  const handleEditSite = (site: SiteInteressante) => {
+    setEditingSiteId(site.id);
+    setSiteFormData({
+      titulo: site.titulo,
+      url: site.url,
+      descricao: site.descricao || '',
+      ordem: site.ordem ?? 0,
+      ativo: site.ativo !== false,
+    });
+    setSiteFormOpen(true);
+  };
+
+  const handleSaveSite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!siteFormData.titulo.trim()) {
+      showNotification('Preencha o nome/título do site.', 'error');
+      return;
+    }
+    let formattedUrl = siteFormData.url.trim();
+    if (!formattedUrl) {
+      showNotification('Preencha a URL do site.', 'error');
+      return;
+    }
+    if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+      formattedUrl = 'https://' + formattedUrl;
+    }
+
+    try {
+      const siteToSave: SiteInteressante = {
+        id: editingSiteId || `site-${Date.now()}`,
+        titulo: siteFormData.titulo.trim(),
+        url: formattedUrl,
+        descricao: siteFormData.descricao.trim() || undefined,
+        ordem: Number(siteFormData.ordem) || 0,
+        ativo: siteFormData.ativo,
+        criadoEm: editingSiteId ? (sites.find(s => s.id === editingSiteId)?.criadoEm || new Date().toISOString()) : new Date().toISOString(),
+        atualizadoEm: new Date().toISOString(),
+      };
+
+      await saveSiteInteressanteToDb(siteToSave);
+      
+      const updatedList = editingSiteId 
+        ? sites.map(s => s.id === editingSiteId ? siteToSave : s)
+        : [...sites, siteToSave];
+      
+      setSites(updatedList);
+      onSitesChange?.(updatedList);
+      setSiteFormOpen(false);
+      setEditingSiteId(null);
+      showNotification(editingSiteId ? 'Site atualizado com sucesso!' : 'Site interessante adicionado com sucesso!');
+    } catch {
+      showNotification('Erro ao salvar site interessante.', 'error');
+    }
+  };
+
+  const handleToggleSiteAtivo = async (site: SiteInteressante) => {
+    try {
+      const updated: SiteInteressante = {
+        ...site,
+        ativo: !site.ativo,
+        atualizadoEm: new Date().toISOString(),
+      };
+      await saveSiteInteressanteToDb(updated);
+      const updatedList = sites.map(s => s.id === site.id ? updated : s);
+      setSites(updatedList);
+      onSitesChange?.(updatedList);
+      showNotification(`Site ${updated.ativo ? 'ativado' : 'desativado'} com sucesso.`);
+    } catch {
+      showNotification('Erro ao alterar status do site.', 'error');
+    }
+  };
+
+  const handleRequestDeleteSite = (site: SiteInteressante) => {
+    setSiteToDelete(site);
+    setDeleteSiteModalOpen(true);
+  };
+
+  const handleConfirmDeleteSite = async () => {
+    if (!siteToDelete) return;
+    try {
+      await deleteSiteInteressanteFromDb(siteToDelete.id);
+      const updatedList = sites.filter(s => s.id !== siteToDelete.id);
+      setSites(updatedList);
+      onSitesChange?.(updatedList);
+      showNotification(`Site "${siteToDelete.titulo}" excluído com sucesso.`);
+    } catch {
+      showNotification('Erro ao excluir site.', 'error');
+    } finally {
+      setDeleteSiteModalOpen(false);
+      setSiteToDelete(null);
+    }
+  };
+
   return (
     <div id="admin-dashboard-page" className="min-h-screen bg-black text-white flex flex-col md:flex-row">
       
@@ -754,6 +894,17 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
             </button>
 
             <button
+              id="admin-nav-sites-interessantes"
+              onClick={() => { setActiveView('sites-interessantes'); setMobileSidebarOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors cursor-pointer ${
+                activeView === 'sites-interessantes' ? 'bg-white text-black font-bold' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              <span>SITES INTERESSANTES</span>
+            </button>
+
+            <button
               id="admin-nav-midia"
               onClick={() => { setActiveView('midia'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors cursor-pointer ${
@@ -852,8 +1003,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
               </button>
             </div>
 
-            {/* Metrics 6-Card Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            {/* Metrics 7-Card Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
               <div className="p-5 bg-zinc-950 border border-zinc-850 space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400">
@@ -906,6 +1057,23 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 </span>
                 <p className="font-serif text-3xl font-bold text-white">
                   {stats.totalCategories}
+                </p>
+              </div>
+
+              <div 
+                onClick={() => setActiveView('sites-interessantes')}
+                className="p-5 bg-zinc-950 border border-zinc-850 space-y-1 hover:border-zinc-700 cursor-pointer transition-colors"
+                title="Ver Sites Interessantes"
+              >
+                <span className="text-[10px] uppercase font-mono tracking-widest text-zinc-400 flex items-center justify-between">
+                  <span>SITES</span>
+                  <Globe className="w-3 h-3 text-zinc-500" />
+                </span>
+                <p className="font-serif text-3xl font-bold text-white">
+                  {sites.length}
+                </p>
+                <p className="text-[10px] font-mono text-zinc-500">
+                  {sites.filter(s => s.ativo).length} ativos
                 </p>
               </div>
 
@@ -1955,6 +2123,224 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         )}
 
         {/* ==========================================================
+            VIEW: SITES INTERESSANTES
+           ========================================================== */}
+        {activeView === 'sites-interessantes' && (
+          <div className="space-y-8 max-w-5xl animate-in fade-in">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-850 pb-6">
+              <div>
+                <h1 className="font-serif text-3xl font-bold uppercase text-white tracking-tight">
+                  Sites Interessantes
+                </h1>
+                <p className="text-xs font-mono text-zinc-400 mt-1">
+                  Gerenciamento de referências e portais cênicos exibidos nas páginas de críticas (lateral no computador e rodapé no celular).
+                </p>
+              </div>
+
+              {!siteFormOpen && (
+                <button
+                  id="btn-add-site-interessante"
+                  onClick={handleOpenNewSite}
+                  className="px-5 py-2.5 bg-white text-black font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>NOVO SITE</span>
+                </button>
+              )}
+            </div>
+
+            {/* Form if open */}
+            {siteFormOpen && (
+              <form onSubmit={handleSaveSite} className="bg-zinc-950 border border-zinc-800 p-6 sm:p-8 space-y-6">
+                <div className="flex items-center justify-between border-b border-zinc-850 pb-4">
+                  <h3 className="font-serif text-lg sm:text-xl font-bold uppercase text-white">
+                    {editingSiteId ? 'Editar Site Interessante' : 'Adicionar Novo Site Interessante'}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => { setSiteFormOpen(false); setEditingSiteId(null); }}
+                    className="text-xs font-mono text-zinc-400 hover:text-white uppercase cursor-pointer"
+                  >
+                    Fechar
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="block text-xs uppercase font-mono tracking-wider text-zinc-300">
+                      Nome / Título do Site <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={siteFormData.titulo}
+                      onChange={(e) => setSiteFormData({ ...siteFormData, titulo: e.target.value })}
+                      placeholder="Ex: Revista Questão de Crítica"
+                      className="w-full bg-black border border-zinc-800 p-3 text-white text-sm focus:border-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs uppercase font-mono tracking-wider text-zinc-300">
+                      Link / URL <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={siteFormData.url}
+                      onChange={(e) => setSiteFormData({ ...siteFormData, url: e.target.value })}
+                      placeholder="https://exemplo.com.br"
+                      className="w-full bg-black border border-zinc-800 p-3 text-white text-sm font-mono focus:border-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs uppercase font-mono tracking-wider text-zinc-300">
+                    Descrição Curta (Opcional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={siteFormData.descricao}
+                    onChange={(e) => setSiteFormData({ ...siteFormData, descricao: e.target.value })}
+                    placeholder="Breve nota sobre o portal ou projeto..."
+                    className="w-full bg-black border border-zinc-800 p-3 text-white text-sm focus:border-white focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+                  <div className="space-y-2">
+                    <label className="block text-xs uppercase font-mono tracking-wider text-zinc-300">
+                      Ordem de Exibição
+                    </label>
+                    <input
+                      type="number"
+                      value={siteFormData.ordem}
+                      onChange={(e) => setSiteFormData({ ...siteFormData, ordem: parseInt(e.target.value, 10) || 0 })}
+                      className="w-full sm:w-32 bg-black border border-zinc-800 p-3 text-white text-sm font-mono focus:border-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-6">
+                    <label className="flex items-center gap-2.5 cursor-pointer text-sm font-mono">
+                      <input
+                        type="checkbox"
+                        checked={siteFormData.ativo}
+                        onChange={(e) => setSiteFormData({ ...siteFormData, ativo: e.target.checked })}
+                        className="w-4 h-4 bg-black border-zinc-700 text-white rounded focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                      />
+                      <span className="text-zinc-200 uppercase tracking-wider text-xs">Exibir este site (Ativo)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-850">
+                  <button
+                    type="button"
+                    onClick={() => { setSiteFormOpen(false); setEditingSiteId(null); }}
+                    className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 bg-white hover:bg-zinc-200 text-black text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                  >
+                    {editingSiteId ? 'Salvar Alterações' : 'Cadastrar Site'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Sites List */}
+            {sites.length === 0 ? (
+              <div className="p-12 border border-zinc-900 bg-zinc-950 text-center space-y-4">
+                <Globe className="w-12 h-12 text-zinc-600 mx-auto" />
+                <h3 className="font-serif text-xl text-white font-bold uppercase">
+                  Nenhum site cadastrado ainda
+                </h3>
+                <p className="text-zinc-400 text-xs sm:text-sm max-w-md mx-auto font-light leading-relaxed">
+                  Conforme solicitado, a lista de sites interessantes inicia sem nenhum link cadastrado. Você pode começar a adicionar sites e referências teatrais clicando no botão abaixo.
+                </p>
+                <button
+                  onClick={handleOpenNewSite}
+                  className="mt-2 px-6 py-2.5 bg-white text-black font-semibold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors cursor-pointer"
+                >
+                  Adicionar Primeiro Site
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-xs font-mono text-zinc-400 uppercase tracking-wider">
+                  {sites.length} {sites.length === 1 ? 'Site Cadastrado' : 'Sites Cadastrados'}
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  {sites.map((site) => (
+                    <div
+                      key={site.id}
+                      className="p-5 bg-zinc-950 border border-zinc-850 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors hover:border-zinc-700"
+                    >
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="flex items-center gap-2.5">
+                          <h4 className="font-serif font-bold text-base text-white truncate">
+                            {site.titulo}
+                          </h4>
+                          <span className={`px-2 py-0.5 text-[10px] uppercase font-mono tracking-wider border ${
+                            site.ativo 
+                              ? 'border-emerald-800 text-emerald-400 bg-emerald-950/40' 
+                              : 'border-zinc-800 text-zinc-500 bg-zinc-900'
+                          }`}>
+                            {site.ativo ? 'Ativo' : 'Oculto'}
+                          </span>
+                        </div>
+                        {site.descricao && (
+                          <p className="text-xs text-zinc-400 line-clamp-1">
+                            {site.descricao}
+                          </p>
+                        )}
+                        <a
+                          href={site.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-white truncate transition-colors"
+                        >
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{site.url}</span>
+                        </a>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                        <button
+                          onClick={() => handleToggleSiteAtivo(site)}
+                          className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-mono uppercase tracking-wider border border-zinc-800 transition-colors cursor-pointer"
+                          title={site.ativo ? 'Ocultar site' : 'Ativar site'}
+                        >
+                          {site.ativo ? 'Ocultar' : 'Ativar'}
+                        </button>
+                        <button
+                          onClick={() => handleEditSite(site)}
+                          className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-mono uppercase tracking-wider border border-zinc-800 transition-colors cursor-pointer"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleRequestDeleteSite(site)}
+                          className="p-1.5 bg-zinc-900 hover:bg-red-950/60 text-zinc-400 hover:text-red-400 border border-zinc-800 hover:border-red-800 transition-colors cursor-pointer"
+                          title="Excluir site"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==========================================================
             VIEW: MÍDIA / IMAGENS
            ========================================================== */}
         {activeView === 'midia' && (
@@ -2343,6 +2729,20 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         onCancel={() => {
           setDeletePaginaModalOpen(false);
           setPaginaToDelete(null);
+        }}
+      />
+
+      {/* Delete Confirmation Modal for Site Interessante */}
+      <ModalConfirm
+        isOpen={deleteSiteModalOpen}
+        title="Excluir Site Interessante"
+        message={`Tem certeza que deseja remover o site "${siteToDelete?.titulo}"? Ele deixará de ser exibido na lista de referências do site.`}
+        confirmText="Sim, Excluir Site"
+        cancelText="Cancelar"
+        onConfirm={handleConfirmDeleteSite}
+        onCancel={() => {
+          setDeleteSiteModalOpen(false);
+          setSiteToDelete(null);
         }}
       />
 
