@@ -4,6 +4,7 @@ import { Critica, HomeSettings } from '../types';
 import { Logo } from '../components/Logo';
 import { CriticaCard } from '../components/CriticaCard';
 import { SearchBar } from '../components/SearchBar';
+import { SiteViewsCounter } from '../components/SiteViewsCounter';
 import { getHomeSettings } from '../services/firebase';
 
 interface HomePageProps {
@@ -120,6 +121,13 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
             </div>
           </form>
         </div>
+      </section>
+
+      {/* =========================================================================
+          2.5. TOTAL SITE VIEWS COUNTER (Contador Total de Visualizações do Site)
+         ========================================================================= */}
+      <section id="home-views-counter-section" className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SiteViewsCounter />
       </section>
 
       {/* =========================================================================

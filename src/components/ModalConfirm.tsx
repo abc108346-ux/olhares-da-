@@ -23,7 +23,7 @@ export const ModalConfirm: React.FC<ModalConfirmProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-zinc-950 border border-zinc-700 max-w-md w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-start gap-4">
           <div className="p-2.5 bg-zinc-900 border border-zinc-700 text-zinc-300">

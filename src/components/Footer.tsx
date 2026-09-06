@@ -1,6 +1,7 @@
 import React from 'react';
 import { Instagram, ArrowUpRight, ArrowUp } from 'lucide-react';
 import { Logo } from './Logo';
+import { SiteViewsCounter } from './SiteViewsCounter';
 import { Pagina } from '../types';
 
 interface FooterProps {
@@ -138,7 +139,8 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, paginas = [] }) => {
             </a>
           </div>
 
-          <div className="flex items-center space-x-6">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+            <SiteViewsCounter variant="compact" />
             <span className="hidden sm:inline text-zinc-500">ISSN / Arquivo Cultural Cênico</span>
             <button
               id="footer-back-to-top"

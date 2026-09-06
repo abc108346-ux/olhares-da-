@@ -81,6 +81,12 @@ export interface HomeSettings {
   manifestoCaption: string;
 }
 
+export interface SiteStats {
+  totalViews: number;
+  lastViewAt?: string;
+  uniqueVisitors?: number;
+}
+
 export interface SearchFilterState {
   termo: string;
   categoria: string;

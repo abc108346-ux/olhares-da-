@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, Link as LinkIcon, Trash2, CheckCircle2, Image as ImageIcon } from 'lucide-react';
 
 interface ImageUploadManagerProps {
@@ -21,6 +21,10 @@ export const ImageUploadManager: React.FC<ImageUploadManagerProps> = ({
   const [mode, setMode] = useState<'url' | 'upload'>('url');
   const [uploading, setUploading] = useState(false);
   const [inputUrl, setInputUrl] = useState(value || '');
+
+  useEffect(() => {
+    setInputUrl(value || '');
+  }, [value]);
 
   const handleApplyUrl = () => {
     onChange(inputUrl.trim());

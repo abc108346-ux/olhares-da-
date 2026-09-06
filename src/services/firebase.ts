@@ -13,7 +13,8 @@ import {
   where, 
   orderBy, 
   onSnapshot,
-  Timestamp 
+  Timestamp,
+  increment
 } from 'firebase/firestore';
 import { 
   getAuth, 
@@ -28,7 +29,7 @@ import {
   browserSessionPersistence,
   User 
 } from 'firebase/auth';
-import { Critica, UserProfile, Pagina, HomeSettings } from '../types';
+import { Critica, UserProfile, Pagina, HomeSettings, SiteStats } from '../types';
 import { INITIAL_CRITICAS } from '../data/initialCriticas';
 
 import firebaseConfigJson from '../../firebase-applet-config.json';
@@ -37,6 +38,7 @@ import firebaseConfigJson from '../../firebase-applet-config.json';
 const STORAGE_KEY = 'olhares_da_cena_criticas_v2';
 const PAGINAS_STORAGE_KEY = 'olhares_da_cena_paginas';
 const ADMIN_SESSION_KEY = 'olhares_da_cena_admin_session';
+const SITE_STATS_STORAGE_KEY = 'olhares_da_cena_site_stats';
 
 const viteEnv = (import.meta as any).env || {};
 
@@ -457,6 +459,243 @@ export const saveHomeSettings = async (settings: HomeSettings): Promise<boolean>
     return true;
   } catch (err) {
     console.warn('Could not save home settings to Firestore:', err);
+    return false;
+  }
+};
+
+// ==========================================
+// REAL SITE STATS & UNIQUE DEVICE COUNTER
+// ==========================================
+
+const DEVICE_TOKEN_KEY = 'olhares_device_token_v1';
+const DEVICE_COUNTED_FLAG = 'olhares_device_counted_v1';
+
+export const getOrCreateDeviceId = (): string => {
+  try {
+    let id = localStorage.getItem(DEVICE_TOKEN_KEY);
+    if (!id) {
+      id = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+      localStorage.setItem(DEVICE_TOKEN_KEY, id);
+    }
+    return id;
+  } catch (e) {
+    return 'dev_fallback_' + Date.now();
+  }
+};
+
+export const isCurrentDeviceAlreadyCounted = (): boolean => {
+  try {
+    return localStorage.getItem(DEVICE_COUNTED_FLAG) === 'true';
+  } catch (e) {
+    return false;
+  }
+};
+
+export const getLocalSiteStats = (): SiteStats => {
+  try {
+    const cached = localStorage.getItem(SITE_STATS_STORAGE_KEY);
+    if (cached !== null) {
+      const parsed = JSON.parse(cached);
+      if (typeof parsed === 'object' && typeof parsed.totalViews === 'number') {
+        // Sanitize old mock number (>= 1200) to real count (1)
+        if (parsed.totalViews >= 1200) {
+          parsed.totalViews = 1;
+        }
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not read site stats from localStorage:', e);
+  }
+  return { totalViews: 1, lastViewAt: new Date().toISOString() };
+};
+
+export const setLocalSiteStats = (stats: SiteStats) => {
+  try {
+    // Sanitize old mock numbers
+    const cleanStats = {
+      ...stats,
+      totalViews: stats.totalViews >= 1200 ? 1 : Math.max(0, stats.totalViews)
+    };
+    localStorage.setItem(SITE_STATS_STORAGE_KEY, JSON.stringify(cleanStats));
+  } catch (e) {
+    console.warn('Could not write site stats to localStorage:', e);
+  }
+};
+
+/**
+ * Fetch current site stats once from Firestore (read-only, does NOT increment)
+ */
+export const getSiteStats = async (): Promise<SiteStats> => {
+  try {
+    const docRef = doc(db, 'settings', 'stats');
+    const snapshot = await getDoc(docRef);
+    if (snapshot.exists()) {
+      const data = snapshot.data();
+      let totalViews = typeof data.totalViews === 'number' ? data.totalViews : 1;
+      
+      // If Firestore contains the old mock value (>= 1200), reset it to 1 real visit
+      if (totalViews >= 1200) {
+        totalViews = 1;
+        await setDoc(docRef, {
+          totalViews: 1,
+          lastViewAt: new Date().toISOString(),
+          resetFromMockAt: new Date().toISOString()
+        }, { merge: true });
+      }
+
+      const stats: SiteStats = {
+        totalViews,
+        lastViewAt: data.lastViewAt || new Date().toISOString(),
+        uniqueVisitors: totalViews,
+      };
+      setLocalSiteStats(stats);
+      return stats;
+    } else {
+      // First initialization: Start with 1 (the current real visitor)
+      const initial: SiteStats = { totalViews: 1, lastViewAt: new Date().toISOString() };
+      await setDoc(docRef, initial, { merge: true });
+      setLocalSiteStats(initial);
+      return initial;
+    }
+  } catch (err) {
+    console.warn('Firestore fetch site stats fallback to local:', err);
+  }
+  return getLocalSiteStats();
+};
+
+/**
+ * Real-time listener for site view stats (read-only)
+ */
+export const subscribeToSiteStats = (callback: (stats: SiteStats) => void) => {
+  try {
+    const docRef = doc(db, 'settings', 'stats');
+    return onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        let totalViews = typeof data.totalViews === 'number' ? data.totalViews : 1;
+        if (totalViews >= 1200) {
+          totalViews = 1;
+        }
+        const stats: SiteStats = {
+          totalViews,
+          lastViewAt: data.lastViewAt || new Date().toISOString(),
+          uniqueVisitors: totalViews,
+        };
+        setLocalSiteStats(stats);
+        callback(stats);
+      } else {
+        const local = getLocalSiteStats();
+        callback(local);
+      }
+    }, (error) => {
+      if ((error as any)?.code !== 'unavailable') {
+        console.warn('Real-time stats snapshot error:', error);
+      }
+      callback(getLocalSiteStats());
+    });
+  } catch (err) {
+    console.warn('Failed to attach site stats onSnapshot:', err);
+    callback(getLocalSiteStats());
+    return () => {};
+  }
+};
+
+/**
+ * Registers a visit ONLY if this device has never been counted before.
+ * Refreshing the page, reopening tabs, or clicking buttons will NEVER increment this!
+ */
+export const registerDeviceVisitOnce = async (): Promise<number> => {
+  const deviceId = getOrCreateDeviceId();
+  const alreadyCounted = isCurrentDeviceAlreadyCounted();
+
+  // If this device was already counted on this browser, DO NOT increment. Simply fetch latest.
+  if (alreadyCounted) {
+    const current = await getSiteStats();
+    return current.totalViews;
+  }
+
+  // Mark device as counted in persistent localStorage immediately
+  try {
+    localStorage.setItem(DEVICE_COUNTED_FLAG, 'true');
+    localStorage.setItem('olhares_first_visit_at', new Date().toISOString());
+  } catch (e) {
+    console.warn('Failed to set device counted flag in localStorage:', e);
+  }
+
+  try {
+    const docRef = doc(db, 'settings', 'stats');
+    const nowIso = new Date().toISOString();
+    
+    // Check current stats
+    const checkSnap = await getDoc(docRef);
+    if (!checkSnap.exists()) {
+      // First device ever
+      await setDoc(docRef, {
+        totalViews: 1,
+        lastViewAt: nowIso,
+        firstDeviceAt: nowIso,
+      });
+      setLocalSiteStats({ totalViews: 1, lastViewAt: nowIso });
+      return 1;
+    }
+
+    const data = checkSnap.data();
+    let currentTotal = typeof data.totalViews === 'number' ? data.totalViews : 0;
+
+    // If it was the old simulated value >= 1200, reset it to 1
+    if (currentTotal >= 1200) {
+      await setDoc(docRef, {
+        totalViews: 1,
+        lastViewAt: nowIso,
+        resetFromMockAt: nowIso
+      }, { merge: true });
+      setLocalSiteStats({ totalViews: 1, lastViewAt: nowIso });
+      return 1;
+    }
+
+    // Atomically increment for this genuinely new device
+    await setDoc(docRef, {
+      totalViews: increment(1),
+      lastViewAt: nowIso,
+    }, { merge: true });
+
+    const updatedSnap = await getDoc(docRef);
+    if (updatedSnap.exists()) {
+      const updatedData = updatedSnap.data();
+      const updatedTotal = typeof updatedData.totalViews === 'number' ? updatedData.totalViews : currentTotal + 1;
+      setLocalSiteStats({ totalViews: updatedTotal, lastViewAt: updatedData.lastViewAt || nowIso });
+      return updatedTotal;
+    }
+  } catch (err) {
+    console.warn('Could not persist new device to Firestore:', err);
+  }
+
+  const local = getLocalSiteStats();
+  return local.totalViews;
+};
+
+/**
+ * Backward compatibility alias (only increments if device is new)
+ */
+export const recordSiteView = async (): Promise<number> => {
+  return registerDeviceVisitOnce();
+};
+
+/**
+ * Update or calibrate site views (Admin tool)
+ */
+export const updateSiteTotalViews = async (newTotal: number): Promise<boolean> => {
+  try {
+    const docRef = doc(db, 'settings', 'stats');
+    await setDoc(docRef, {
+      totalViews: Math.max(0, newTotal),
+      lastViewAt: new Date().toISOString(),
+    }, { merge: true });
+    setLocalSiteStats({ totalViews: Math.max(0, newTotal), lastViewAt: new Date().toISOString() });
+    return true;
+  } catch (err) {
+    console.warn('Could not update site total views in Firestore:', err);
     return false;
   }
 };

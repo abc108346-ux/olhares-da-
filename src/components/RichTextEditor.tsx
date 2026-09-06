@@ -185,9 +185,23 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   });
 
   const editorRef = useRef<HTMLDivElement>(null);
+  const editorBoxContainerRef = useRef<HTMLDivElement>(null);
   const toolbarContainerRef = useRef<HTMLDivElement>(null);
   const savedSelectionRef = useRef<Range | null>(null);
   const isInternalChangeRef = useRef(false);
+
+  // Floating Selection Quick Toolbar State
+  const [floatingToolbar, setFloatingToolbar] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    menu: 'font' | 'size' | 'color' | 'highlight' | null;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    menu: null,
+  });
 
   // Save current DOM selection
   const saveSelection = () => {
@@ -278,16 +292,86 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     return range;
   };
 
-  // Close popovers on click outside
+  // Update floating selection quick toolbar position
+  const updateSelectionToolbar = useCallback(() => {
+    if (editorMode !== 'visual' || !editorRef.current) {
+      setFloatingToolbar(prev => prev.visible ? { ...prev, visible: false, menu: null } : prev);
+      return;
+    }
+
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+      setFloatingToolbar(prev => prev.visible ? { ...prev, visible: false, menu: null } : prev);
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    if (!editorRef.current.contains(range.commonAncestorContainer)) {
+      setFloatingToolbar(prev => prev.visible ? { ...prev, visible: false, menu: null } : prev);
+      return;
+    }
+
+    const selectedText = range.toString().trim();
+    if (!selectedText) {
+      setFloatingToolbar(prev => prev.visible ? { ...prev, visible: false, menu: null } : prev);
+      return;
+    }
+
+    savedSelectionRef.current = range.cloneRange();
+
+    const container = editorBoxContainerRef.current;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const rect = range.getBoundingClientRect();
+
+    if (rect.width === 0 && rect.height === 0) return;
+
+    const relLeft = rect.left - containerRect.left + (rect.width / 2);
+    const clampedX = Math.max(220, Math.min(relLeft, containerRect.width - 220));
+
+    let y = rect.top - containerRect.top - 50;
+    if (y < 45) {
+      y = rect.bottom - containerRect.top + 10;
+    }
+
+    setFloatingToolbar(prev => ({
+      ...prev,
+      visible: true,
+      x: clampedX,
+      y,
+    }));
+  }, [editorMode]);
+
+  // Close popovers and floating menus on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (toolbarContainerRef.current && !toolbarContainerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (toolbarContainerRef.current && !toolbarContainerRef.current.contains(target)) {
         setActivePopover(null);
+      }
+      const floatingEl = document.getElementById('editor-floating-selection-toolbar');
+      if (floatingEl && !floatingEl.contains(target)) {
+        setFloatingToolbar(prev => ({ ...prev, menu: null }));
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Listen to selection changes to update or dismiss floating bar
+  useEffect(() => {
+    const handleDocSelection = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed) {
+        setFloatingToolbar(prev => prev.visible ? { ...prev, visible: false, menu: null } : prev);
+      }
+    };
+    document.addEventListener('selectionchange', handleDocSelection);
+    return () => {
+      document.removeEventListener('selectionchange', handleDocSelection);
     };
   }, []);
 
@@ -408,6 +492,175 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     checkActiveFormats();
   };
 
+  // Check if a color string is black or very dark (which is unreadable on dark background)
+  const isBlackOrDarkColor = (colorStr: string): boolean => {
+    if (!colorStr) return false;
+    const c = colorStr.trim().toLowerCase();
+
+    const darkNames = ['black', '#000', '#000000', '#0000', 'darkslategray', 'darkslategrey', 'charcoal', 'midnightblue', 'navy'];
+    if (darkNames.includes(c)) return true;
+
+    if (c.startsWith('#')) {
+      let hex = c.slice(1);
+      if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
+      else if (hex.length === 4) hex = hex.slice(0, 3).split('').map(x => x + x).join('');
+      else if (hex.length === 8) hex = hex.slice(0, 6);
+
+      if (hex.length === 6) {
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+          const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+          return luminance < 85;
+        }
+      }
+    }
+
+    const rgbMatch = c.match(/rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (rgbMatch) {
+      const r = parseInt(rgbMatch[1], 10);
+      const g = parseInt(rgbMatch[2], 10);
+      const b = parseInt(rgbMatch[3], 10);
+      const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+      return luminance < 85;
+    }
+
+    const hslMatch = c.match(/hsla?\((\d+)\s*,\s*(\d+)%?\s*,\s*(\d+)%/);
+    if (hslMatch) {
+      const lightness = parseInt(hslMatch[3], 10);
+      return lightness < 30;
+    }
+
+    return false;
+  };
+
+  // Check if background color is white or light (unreadable with white text)
+  const isWhiteOrLightColor = (colorStr: string): boolean => {
+    if (!colorStr) return false;
+    const c = colorStr.trim().toLowerCase();
+    if (['white', '#fff', '#ffffff', '#fafafa', '#f4f4f5', '#f5f5f5', '#f3f4f6', '#e5e7eb', '#f8fafc'].includes(c)) {
+      return true;
+    }
+
+    if (c.startsWith('#')) {
+      let hex = c.slice(1);
+      if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
+      if (hex.length === 6) {
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        return lum > 210;
+      }
+    }
+
+    const rgbMatch = c.match(/rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (rgbMatch) {
+      const r = parseInt(rgbMatch[1], 10);
+      const g = parseInt(rgbMatch[2], 10);
+      const b = parseInt(rgbMatch[3], 10);
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      return lum > 210;
+    }
+    return false;
+  };
+
+  // Process pasted HTML: turn black/dark text into white, keep other colors intact, strip bright background rectangles
+  const processPastedHtml = (rawHtml: string): string => {
+    if (!rawHtml) return '';
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawHtml, 'text/html');
+
+      const removeElements = doc.querySelectorAll('script, style, meta, link, noscript');
+      removeElements.forEach(el => el.remove());
+
+      const allElements = doc.body.querySelectorAll('*');
+      allElements.forEach(el => {
+        const htmlEl = el as HTMLElement;
+
+        // Convert <font color="..."> if black/dark to #ffffff, keep other colors
+        if (htmlEl.tagName === 'FONT') {
+          const fontColor = htmlEl.getAttribute('color');
+          if (fontColor) {
+            if (isBlackOrDarkColor(fontColor)) {
+              htmlEl.setAttribute('color', '#ffffff');
+              htmlEl.style.color = '#ffffff';
+            }
+          }
+        }
+
+        // Convert inline style color if black/dark to #ffffff, keep other colors
+        if (htmlEl.style && htmlEl.style.color) {
+          const colorVal = htmlEl.style.color;
+          if (isBlackOrDarkColor(colorVal)) {
+            htmlEl.style.color = '#ffffff';
+          }
+        }
+
+        // Clear light/white background or black background boxes copied from external sites
+        if (htmlEl.style && (htmlEl.style.backgroundColor || htmlEl.style.background)) {
+          const bgVal = htmlEl.style.backgroundColor || htmlEl.style.background;
+          if (isWhiteOrLightColor(bgVal) || isBlackOrDarkColor(bgVal)) {
+            htmlEl.style.removeProperty('background-color');
+            htmlEl.style.removeProperty('background');
+          }
+        }
+      });
+
+      return doc.body.innerHTML;
+    } catch (err) {
+      console.warn('Error processing pasted HTML:', err);
+      return rawHtml;
+    }
+  };
+
+  // On Paste event handler
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const clipboardData = e.clipboardData;
+    const html = clipboardData.getData('text/html');
+    const text = clipboardData.getData('text/plain');
+
+    let processedHtml = '';
+    if (html && html.trim()) {
+      processedHtml = processPastedHtml(html);
+    } else if (text) {
+      const paragraphs = text.split(/\r\n\r\n|\n\n/).filter(p => p.trim().length > 0);
+      if (paragraphs.length > 1) {
+        processedHtml = paragraphs
+          .map(p => `<p style="color: #ffffff;">${p.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r\n|\n/g, '<br/>')}</p>`)
+          .join('');
+      } else {
+        processedHtml = text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r\n|\n/g, '<br/>');
+      }
+    }
+
+    if (!processedHtml) return;
+
+    restoreSelection();
+    const success = document.execCommand('insertHTML', false, processedHtml);
+    if (!success) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = processedHtml;
+        const frag = document.createDocumentFragment();
+        while (tempDiv.firstChild) {
+          frag.appendChild(tempDiv.firstChild);
+        }
+        range.insertNode(frag);
+      }
+    }
+    saveSelection();
+    handleContentChange();
+    updateSelectionToolbar();
+  };
+
   // Generic execCommand with focus & selection protection
   const execCmd = (command: string, val: string | undefined = undefined) => {
     if (editorMode !== 'visual') return;
@@ -417,6 +670,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     saveSelection();
     handleContentChange();
     checkActiveFormats();
+    updateSelectionToolbar();
   };
 
   // Robust Inline Style Applicator (for Font Size, Font Family, Colors) with seamless selection retention
@@ -429,6 +683,35 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
     const range = expandToWordOrBlockIfCollapsed(sel);
     if (!range) return;
+
+    // Helper to remove any conflicting inline style from child nodes so new format takes full effect
+    const cleanInnerProperty = (node: Node) => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        if (styleProp === 'color') {
+          el.style.removeProperty('color');
+          if (el.tagName === 'FONT' && el.hasAttribute('color')) {
+            el.removeAttribute('color');
+          }
+        } else if (styleProp === 'fontFamily') {
+          el.style.removeProperty('font-family');
+          if (el.tagName === 'FONT' && el.hasAttribute('face')) {
+            el.removeAttribute('face');
+          }
+        } else if (styleProp === 'fontSize') {
+          el.style.removeProperty('font-size');
+          if (el.tagName === 'FONT' && el.hasAttribute('size')) {
+            el.removeAttribute('size');
+          }
+        } else if (styleProp === 'backgroundColor') {
+          el.style.removeProperty('background-color');
+          el.style.removeProperty('background');
+        }
+        for (let i = 0; i < el.childNodes.length; i++) {
+          cleanInnerProperty(el.childNodes[i]);
+        }
+      }
+    };
 
     // Check if the selection is already inside an existing styled span we can directly modify
     let targetSpan: HTMLElement | null = null;
@@ -446,6 +729,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
 
     if (targetSpan) {
+      cleanInnerProperty(targetSpan);
       if (styleProp === 'fontSize') targetSpan.style.fontSize = styleValue;
       if (styleProp === 'fontFamily') targetSpan.style.fontFamily = styleValue;
       if (styleProp === 'color') targetSpan.style.color = styleValue;
@@ -462,6 +746,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       }
       selectElement(targetSpan);
       handleContentChange();
+      updateSelectionToolbar();
       return;
     }
 
@@ -469,6 +754,8 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     if (!range.collapsed) {
       try {
         const contents = range.extractContents();
+        cleanInnerProperty(contents);
+
         const span = document.createElement('span');
 
         if (styleProp === 'fontSize') span.style.fontSize = styleValue;
@@ -485,9 +772,10 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         span.appendChild(contents);
         range.insertNode(span);
 
-        // Keep newly styled span selected!
+        // Keep newly styled span selected so user can change another style while selected!
         selectElement(span);
         handleContentChange();
+        updateSelectionToolbar();
         return;
       } catch (e) {
         console.warn('Error applying inline style:', e);
@@ -502,6 +790,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     if (styleProp === 'fontSize') document.execCommand('fontSize', false, styleValue);
     saveSelection();
     handleContentChange();
+    updateSelectionToolbar();
   };
 
   // Apply Heading / Style with automatic block selection retention
@@ -823,7 +1112,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       )}
 
       {/* Main Box Container */}
-      <div className="border border-zinc-800 bg-zinc-950 flex flex-col relative shadow-2xl">
+      <div ref={editorBoxContainerRef} className="border border-zinc-800 bg-zinc-950 flex flex-col relative shadow-2xl">
         
         {/* =========================================================================
             BLOGGER-INSPIRED FULL FORMATTING TOOLBAR
@@ -1933,17 +2222,295 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           
           {/* 1. Visual WYSIWYG Editor (ContentEditable) */}
           {editorMode === 'visual' && (
-            <div
-              id="rich-editor-visual"
-              ref={editorRef}
-              contentEditable
-              onInput={handleContentChange}
-              onKeyUp={checkActiveFormats}
-              onMouseUp={checkActiveFormats}
-              style={{ minHeight }}
-              className="editorial-rich-editor-content w-full bg-black text-zinc-100 p-6 sm:p-8 font-serif text-base sm:text-lg leading-relaxed focus:outline-none overflow-y-auto"
-              data-placeholder="Comece a escrever o texto aqui... Selecione qualquer palavra ou frase e use as ferramentas da barra superior para trocar fontes, tamanhos, cores de texto e destaques de fundo."
-            />
+            <>
+              {/* Floating Selection Quick Toolbar (Appears directly on text selection) */}
+              {floatingToolbar.visible && (
+                <div
+                  id="editor-floating-selection-toolbar"
+                  style={{
+                    position: 'absolute',
+                    left: `${floatingToolbar.x}px`,
+                    top: `${floatingToolbar.y}px`,
+                    transform: 'translateX(-50%)',
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  className="z-50 flex items-center bg-zinc-900 border border-zinc-700 shadow-2xl p-1 gap-1 animate-in fade-in zoom-in-95 text-zinc-300 select-none text-xs"
+                >
+                  {/* Fonte */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); }}
+                      onClick={() => setFloatingToolbar(prev => ({ ...prev, menu: prev.menu === 'font' ? null : 'font' }))}
+                      className={`flex items-center gap-1 px-2 py-1 text-xs border border-zinc-700 bg-zinc-950 hover:border-zinc-500 hover:text-white transition-colors cursor-pointer ${floatingToolbar.menu === 'font' ? 'border-amber-400 text-amber-300' : ''}`}
+                      title="Alterar Tipografia / Fonte"
+                    >
+                      <Type className="w-3.5 h-3.5" />
+                      <span className="max-w-[70px] truncate">{currentFontName !== 'Fonte' ? currentFontName : 'Fonte'}</span>
+                      <ChevronDown className="w-3 h-3 text-zinc-400" />
+                    </button>
+
+                    {floatingToolbar.menu === 'font' && (
+                      <div
+                        onMouseDown={(e) => { e.preventDefault(); }}
+                        className="absolute left-0 top-full mt-1.5 w-52 bg-zinc-950 border border-zinc-700 shadow-2xl z-50 p-1.5 flex flex-col gap-0.5"
+                      >
+                        <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 px-2 py-1 border-b border-zinc-800 mb-1">
+                          Escolher Tipografia
+                        </div>
+                        {FONT_FAMILIES.map(f => (
+                          <button
+                            key={f.name}
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); }}
+                            onClick={() => {
+                              handleFontChange(f.value, f.sample);
+                              setFloatingToolbar(prev => ({ ...prev, menu: null }));
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
+                            style={{ fontFamily: f.value }}
+                          >
+                            <span>{f.name}</span>
+                            <span className="text-[10px] text-zinc-400">Aa</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tamanho */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); }}
+                      onClick={() => setFloatingToolbar(prev => ({ ...prev, menu: prev.menu === 'size' ? null : 'size' }))}
+                      className={`flex items-center gap-1 px-2 py-1 text-xs border border-zinc-700 bg-zinc-950 hover:border-zinc-500 hover:text-white transition-colors cursor-pointer ${floatingToolbar.menu === 'size' ? 'border-amber-400 text-amber-300' : ''}`}
+                      title="Alterar Tamanho"
+                    >
+                      <span className="font-semibold text-xs">T</span>
+                      <span className="text-xs">{currentFontSize !== 'Tamanho' ? currentFontSize : 'Tam.'}</span>
+                      <ChevronDown className="w-3 h-3 text-zinc-400" />
+                    </button>
+
+                    {floatingToolbar.menu === 'size' && (
+                      <div
+                        onMouseDown={(e) => { e.preventDefault(); }}
+                        className="absolute left-0 top-full mt-1.5 w-44 bg-zinc-950 border border-zinc-700 shadow-2xl z-50 p-1.5 flex flex-col gap-0.5"
+                      >
+                        <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 px-2 py-1 border-b border-zinc-800 mb-1">
+                          Tamanho do Texto
+                        </div>
+                        {FONT_SIZES.map(s => (
+                          <button
+                            key={s.name}
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); }}
+                            onClick={() => {
+                              handleFontSizeChange(s.px, s.label);
+                              setFloatingToolbar(prev => ({ ...prev, menu: null }));
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
+                          >
+                            <span>{s.name}</span>
+                            <span className="text-[10px] font-mono text-zinc-400">{s.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Cor do Texto */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); }}
+                      onClick={() => setFloatingToolbar(prev => ({ ...prev, menu: prev.menu === 'color' ? null : 'color' }))}
+                      className={`flex items-center gap-1 px-2 py-1 text-xs border border-zinc-700 bg-zinc-950 hover:border-zinc-500 hover:text-white transition-colors cursor-pointer ${floatingToolbar.menu === 'color' ? 'border-amber-400 text-amber-300' : ''}`}
+                      title="Alterar Cor do Texto Selecionado"
+                    >
+                      <div className="flex flex-col items-center">
+                        <Baseline className="w-3.5 h-3.5" />
+                        <span className="w-3.5 h-1 block mt-0.5" style={{ backgroundColor: selectedTextColor }} />
+                      </div>
+                      <ChevronDown className="w-3 h-3 text-zinc-400" />
+                    </button>
+
+                    {floatingToolbar.menu === 'color' && (
+                      <div
+                        onMouseDown={(e) => { e.preventDefault(); }}
+                        className="absolute left-0 top-full mt-1.5 w-60 bg-zinc-950 border border-zinc-700 shadow-2xl z-50 p-2 flex flex-col gap-2"
+                      >
+                        <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 border-b border-zinc-800 pb-1">
+                          Cor da Fonte Selecionada
+                        </div>
+                        <div className="grid grid-cols-6 gap-1.5">
+                          {COLOR_PALETTE.map(c => (
+                            <button
+                              key={c.name}
+                              type="button"
+                              onMouseDown={(e) => { e.preventDefault(); }}
+                              onClick={() => {
+                                handleTextColorChange(c.value);
+                                setFloatingToolbar(prev => ({ ...prev, menu: null }));
+                              }}
+                              className="w-7 h-7 border border-zinc-700 hover:scale-110 hover:border-white transition-transform flex items-center justify-center cursor-pointer"
+                              style={{ backgroundColor: c.value }}
+                              title={c.name}
+                            >
+                              {selectedTextColor === c.value && (
+                                <Check className={`w-3 h-3 ${c.value === '#ffffff' || c.value === '#eab308' ? 'text-black' : 'text-white'}`} />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="pt-2 border-t border-zinc-800 flex items-center justify-between text-xs">
+                          <span className="text-[11px] text-zinc-400">Personalizada:</span>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="color"
+                              value={customTextColor}
+                              onChange={(e) => {
+                                setCustomTextColor(e.target.value);
+                                handleTextColorChange(e.target.value);
+                              }}
+                              className="w-6 h-6 bg-transparent cursor-pointer border border-zinc-700"
+                            />
+                            <span className="font-mono text-[10px] text-zinc-400 uppercase">{customTextColor}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Marcador / Fundo */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); }}
+                      onClick={() => setFloatingToolbar(prev => ({ ...prev, menu: prev.menu === 'highlight' ? null : 'highlight' }))}
+                      className={`flex items-center gap-1 px-2 py-1 text-xs border border-zinc-700 bg-zinc-950 hover:border-zinc-500 hover:text-white transition-colors cursor-pointer ${floatingToolbar.menu === 'highlight' ? 'border-amber-400 text-amber-300' : ''}`}
+                      title="Marcador / Fundo do Texto"
+                    >
+                      <div className="flex flex-col items-center">
+                        <Highlighter className="w-3.5 h-3.5" />
+                        <span className="w-3.5 h-1 block mt-0.5" style={{ backgroundColor: selectedHighlightColor === 'transparent' ? '#52525b' : selectedHighlightColor }} />
+                      </div>
+                      <ChevronDown className="w-3 h-3 text-zinc-400" />
+                    </button>
+
+                    {floatingToolbar.menu === 'highlight' && (
+                      <div
+                        onMouseDown={(e) => { e.preventDefault(); }}
+                        className="absolute left-0 top-full mt-1.5 w-60 bg-zinc-950 border border-zinc-700 shadow-2xl z-50 p-2 flex flex-col gap-2"
+                      >
+                        <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 border-b border-zinc-800 pb-1">
+                          Marcador de Fundo
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {HIGHLIGHT_PALETTE.map(h => (
+                            <button
+                              key={h.name}
+                              type="button"
+                              onMouseDown={(e) => { e.preventDefault(); }}
+                              onClick={() => {
+                                handleHighlightColorChange(h.value);
+                                setFloatingToolbar(prev => ({ ...prev, menu: null }));
+                              }}
+                              className="h-7 px-1.5 text-[10px] border border-zinc-700 hover:scale-105 hover:border-white transition-all flex items-center justify-center cursor-pointer text-white"
+                              style={{ backgroundColor: h.previewBg }}
+                              title={h.name}
+                            >
+                              {h.value === 'transparent' ? 'Nenhum' : 'Cor'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="w-[1px] h-4 bg-zinc-700 mx-0.5" />
+
+                  {/* Negrito */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => execCmd('bold')}
+                    className={`p-1.5 border border-zinc-700 transition-colors cursor-pointer ${activeFormats.bold ? 'bg-zinc-800 text-amber-300 font-bold border-zinc-500' : 'bg-zinc-950 text-zinc-300 hover:text-white'}`}
+                    title="Negrito (Ctrl+B)"
+                  >
+                    <Bold className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Itálico */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => execCmd('italic')}
+                    className={`p-1.5 border border-zinc-700 transition-colors cursor-pointer ${activeFormats.italic ? 'bg-zinc-800 text-amber-300 italic border-zinc-500' : 'bg-zinc-950 text-zinc-300 hover:text-white'}`}
+                    title="Itálico (Ctrl+I)"
+                  >
+                    <Italic className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Sublinhado */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => execCmd('underline')}
+                    className={`p-1.5 border border-zinc-700 transition-colors cursor-pointer ${activeFormats.underline ? 'bg-zinc-800 text-amber-300 underline border-zinc-500' : 'bg-zinc-950 text-zinc-300 hover:text-white'}`}
+                    title="Sublinhado (Ctrl+U)"
+                  >
+                    <UnderlineIcon className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Tachado */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => execCmd('strikeThrough')}
+                    className={`p-1.5 border border-zinc-700 transition-colors cursor-pointer ${activeFormats.strikeThrough ? 'bg-zinc-800 text-amber-300 border-zinc-500' : 'bg-zinc-950 text-zinc-300 hover:text-white'}`}
+                    title="Tachado"
+                  >
+                    <Strikethrough className="w-3.5 h-3.5" />
+                  </button>
+
+                  <div className="w-[1px] h-4 bg-zinc-700 mx-0.5" />
+
+                  {/* Limpar Formatação */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => execCmd('removeFormat')}
+                    className="p-1.5 border border-zinc-700 bg-zinc-950 text-zinc-400 hover:text-amber-400 hover:border-zinc-500 transition-colors cursor-pointer"
+                    title="Limpar Formatação do Trecho Selecionado"
+                  >
+                    <Eraser className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              <div
+                id="rich-editor-visual"
+                ref={editorRef}
+                contentEditable
+                onInput={handleContentChange}
+                onKeyUp={() => {
+                  checkActiveFormats();
+                  updateSelectionToolbar();
+                }}
+                onMouseUp={() => {
+                  checkActiveFormats();
+                  updateSelectionToolbar();
+                }}
+                onPaste={handlePaste}
+                style={{ minHeight }}
+                className="editorial-rich-editor-content w-full bg-black text-zinc-100 p-6 sm:p-8 font-serif text-base sm:text-lg leading-relaxed focus:outline-none overflow-y-auto"
+                data-placeholder="Comece a escrever o texto aqui... Selecione qualquer palavra ou frase e use a barra flutuante ou a barra superior para trocar cor, fonte, tamanho e estilo enquanto selecionado."
+              />
+            </>
           )}
 
           {/* 2. HTML Code Editor */}

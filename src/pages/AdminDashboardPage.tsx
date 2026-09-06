@@ -4,7 +4,8 @@ import {
   UserProfile, 
   CategoriaTipo, 
   FichaTecnica as FichaTecnicaType,
-  Pagina
+  Pagina,
+  SiteStats
 } from '../types';
 import { 
   saveCriticaToDb, 
@@ -14,7 +15,9 @@ import {
   seedDatabaseIfEmpty, 
   logoutAdminUser,
   getHomeSettings,
-  saveHomeSettings
+  saveHomeSettings,
+  subscribeToSiteStats,
+  updateSiteTotalViews
 } from '../services/firebase';
 import { Logo } from '../components/Logo';
 import { RichTextEditor } from '../components/RichTextEditor';
@@ -164,7 +167,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
     categoria: 'Teatro',
     tags: 'teatro, critica, 2026',
     dataPublicacao: new Date().toISOString().split('T')[0],
-    imagemPrincipal: 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&w=1200&q=85',
+    imagemPrincipal: '',
     legendaImagemPrincipal: '',
     imagensAdicionais: [],
     publicada: true,
@@ -194,6 +197,19 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
     manifestoText: 'Olhares da Cena é um espaço de crítica, reflexão e memória dedicado às artes da cena, onde o acontecimento teatral encontra o pensamento, o olhar e a palavra.',
     manifestoCaption: 'Olhares da Cena • Arquivo Crítico Teatral'
   });
+
+  const [siteStats, setSiteStats] = useState<SiteStats>({ totalViews: 1 });
+  const [customViewCountInput, setCustomViewCountInput] = useState<string>('1');
+
+  useEffect(() => {
+    const unsubStats = subscribeToSiteStats((s) => {
+      setSiteStats(s);
+      setCustomViewCountInput(String(s.totalViews));
+    });
+    return () => {
+      unsubStats();
+    };
+  }, []);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -291,7 +307,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       categoria: 'Teatro',
       tags: 'teatro, critica, 2026',
       dataPublicacao: new Date().toISOString().split('T')[0],
-      imagemPrincipal: 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&w=1200&q=85',
+      imagemPrincipal: '',
       legendaImagemPrincipal: '',
       imagensAdicionais: [],
       publicada: true,
@@ -506,7 +522,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       categoria: formData.categoria,
       tags: parsedTags,
       dataPublicacao: formData.dataPublicacao,
-      imagemPrincipal: formData.imagemPrincipal.trim() || 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&w=1200&q=85',
+      imagemPrincipal: formData.imagemPrincipal.trim(),
       legendaImagemPrincipal: formData.legendaImagemPrincipal.trim(),
       imagens: formData.imagensAdicionais.filter(Boolean),
       publicada: asDraft ? false : formData.publicada,
@@ -600,6 +616,21 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   const handleSeedData = async () => {
     await seedDatabaseIfEmpty();
     showNotification('Base de dados sincronizada com críticas iniciais!');
+  };
+
+  const handleUpdateViewsCount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const count = parseInt(customViewCountInput, 10);
+    if (isNaN(count) || count < 0) {
+      showNotification('Digite um número válido para as visualizações.', 'error');
+      return;
+    }
+    const success = await updateSiteTotalViews(count);
+    if (success) {
+      showNotification('Contador de visualizações atualizado com sucesso!');
+    } else {
+      showNotification('Erro ao atualizar contador no banco de dados.', 'error');
+    }
   };
 
   return (
@@ -819,8 +850,27 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
               </button>
             </div>
 
-            {/* Metrics 5-Card Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Metrics 6-Card Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+              <div className="p-5 bg-zinc-950 border border-zinc-850 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400">
+                    VISITAS DO SITE
+                  </span>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                </div>
+                <p className="font-serif text-3xl font-bold text-white">
+                  {siteStats.totalViews.toLocaleString('pt-BR')}
+                </p>
+                <p className="text-[10px] font-mono text-zinc-500 flex items-center gap-1">
+                  <Eye className="w-3 h-3 text-emerald-400" />
+                  <span>Em tempo real</span>
+                </p>
+              </div>
+
               <div className="p-5 bg-zinc-950 border border-zinc-850 space-y-1">
                 <span className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">
                   TOTAL DE CRÍTICAS
@@ -2099,6 +2149,98 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   Sincronizar Banco de Dados
                 </button>
               </div>
+            </div>
+
+            {/* View Counter Management Card */}
+            <div className="p-6 bg-zinc-950 border border-zinc-850 space-y-6">
+              <div className="flex items-center justify-between border-b border-zinc-900 pb-4">
+                <div className="flex items-center gap-3">
+                  <Eye className="w-5 h-5 text-amber-400" />
+                  <div>
+                    <h3 className="font-mono text-sm uppercase text-white font-bold">
+                      Contador de Visualizações do Site
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Métrica oficial exibida na página inicial do portal Olhares da Cena.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-[10px] uppercase font-mono text-emerald-400 font-bold">
+                    Ao Vivo
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-zinc-900/60 border border-zinc-800 space-y-1">
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-zinc-400">
+                    Contagem Atual Registrada
+                  </span>
+                  <p className="font-serif text-3xl font-bold text-white">
+                    {siteStats.totalViews.toLocaleString('pt-BR')}
+                  </p>
+                  <p className="text-[10px] font-mono text-zinc-500">
+                    Sincronizado via Cloud Firestore
+                  </p>
+                </div>
+
+                <div className="p-4 bg-zinc-900/60 border border-zinc-800 space-y-1">
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-zinc-400">
+                    Último Registro
+                  </span>
+                  <p className="font-mono text-xs text-zinc-300 pt-2">
+                    {siteStats.lastViewAt ? new Date(siteStats.lastViewAt).toLocaleString('pt-BR') : 'Sem registros'}
+                  </p>
+                  <p className="text-[10px] font-mono text-zinc-500">
+                    Incrementado automaticamente a cada visita
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleUpdateViewsCount} className="pt-4 border-t border-zinc-900 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
+                    Ajustar / Redefinir Total de Visualizações Reais
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomViewCountInput('1');
+                      updateSiteTotalViews(1).then(() => {
+                        showNotification('Contador redefinido para 1 (visita deste dispositivo)!');
+                      });
+                    }}
+                    className="text-[10px] font-mono text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                  >
+                    Redefinir para 1 (visita atual)
+                  </button>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="number"
+                    min="0"
+                    value={customViewCountInput}
+                    onChange={(e) => setCustomViewCountInput(e.target.value)}
+                    className="flex-1 bg-zinc-900 border border-zinc-800 text-white p-2.5 font-mono text-sm focus:border-white focus:outline-none"
+                    placeholder="Ex: 1"
+                  />
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-white text-black font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors cursor-pointer"
+                  >
+                    Salvar Número Real
+                  </button>
+                </div>
+                <p className="text-[11px] text-zinc-500 font-light">
+                  A contagem é protegida por filtro de dispositivo único: visitas repetidas e atualizações de página pelo mesmo aparelho não aumentam a métrica.
+                </p>
+              </form>
             </div>
           </div>
         )}
