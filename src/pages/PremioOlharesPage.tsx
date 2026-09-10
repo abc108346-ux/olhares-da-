@@ -102,7 +102,20 @@ export const PremioOlharesPage: React.FC<PremioOlharesPageProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {sortedPremios.map((premio) => {
             const hasImage = Boolean(premio.imagem);
-            const hasLink = Boolean(premio.link);
+            const validLinks: { url: string; titulo?: string }[] = (() => {
+              if (Array.isArray(premio.links) && premio.links.length > 0) {
+                const list = premio.links
+                  .filter(l => Boolean(l && l.url && l.url.trim()))
+                  .map(l => ({ url: l.url.trim(), titulo: (l.titulo || '').trim() }));
+                if (list.length > 0) return list;
+              }
+              if (premio.link && premio.link.trim()) {
+                return [{ url: premio.link.trim(), titulo: '' }];
+              }
+              return [];
+            })();
+
+            const hasLink = validLinks.length > 0;
             const formattedNum = premio.ordem < 10 ? `0${premio.ordem}` : `${premio.ordem}`;
 
             return (
@@ -168,23 +181,47 @@ export const PremioOlharesPage: React.FC<PremioOlharesPageProps> = ({
                     )}
                   </div>
 
-                  {/* Link / CTA Button */}
+                  {/* Link / CTA Button(s) */}
                   <div className="pt-3 border-t border-zinc-900 mt-auto">
                     {hasLink ? (
-                      <a
-                        href={premio.link}
-                        onClick={(e) => handleLinkClick(e, premio.link)}
-                        target={premio.link.startsWith('http') ? '_blank' : undefined}
-                        rel={premio.link.startsWith('http') ? 'noopener noreferrer' : undefined}
-                        className="inline-flex items-center justify-between w-full p-2.5 bg-zinc-900 group-hover:bg-amber-400 group-hover:text-black text-zinc-200 text-xs font-mono uppercase tracking-wider font-semibold border border-zinc-800 group-hover:border-amber-300 transition-all duration-200 cursor-pointer"
-                      >
-                        <span>Acessar Prêmio</span>
-                        {premio.link.startsWith('http') ? (
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        ) : (
-                          <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                        )}
-                      </a>
+                      validLinks.length === 1 ? (
+                        <a
+                          href={validLinks[0].url}
+                          onClick={(e) => handleLinkClick(e, validLinks[0].url)}
+                          target={validLinks[0].url.startsWith('http') ? '_blank' : undefined}
+                          rel={validLinks[0].url.startsWith('http') ? 'noopener noreferrer' : undefined}
+                          className="inline-flex items-center justify-between w-full p-2.5 bg-zinc-900 group-hover:bg-amber-400 group-hover:text-black text-zinc-200 text-xs font-mono uppercase tracking-wider font-semibold border border-zinc-800 group-hover:border-amber-300 transition-all duration-200 cursor-pointer"
+                        >
+                          <span className="truncate pr-2">{validLinks[0].titulo || 'Acessar Prêmio'}</span>
+                          {validLinks[0].url.startsWith('http') ? (
+                            <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                          ) : (
+                            <ArrowUpRight className="w-3.5 h-3.5 shrink-0 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                          )}
+                        </a>
+                      ) : (
+                        <div className="space-y-1.5 w-full">
+                          {validLinks.map((item, lIdx) => (
+                            <a
+                              key={lIdx}
+                              href={item.url}
+                              onClick={(e) => handleLinkClick(e, item.url)}
+                              target={item.url.startsWith('http') ? '_blank' : undefined}
+                              rel={item.url.startsWith('http') ? 'noopener noreferrer' : undefined}
+                              className="inline-flex items-center justify-between w-full px-3 py-2 bg-zinc-900 hover:bg-amber-400 hover:text-black text-zinc-200 text-xs font-mono uppercase tracking-wider font-semibold border border-zinc-850 hover:border-amber-300 transition-all duration-150 cursor-pointer group/link"
+                            >
+                              <span className="truncate pr-2">
+                                {item.titulo || `Link #${lIdx + 1}`}
+                              </span>
+                              {item.url.startsWith('http') ? (
+                                <ExternalLink className="w-3.5 h-3.5 shrink-0 text-zinc-400 group-hover/link:text-black" />
+                              ) : (
+                                <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-zinc-400 group-hover/link:text-black group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
+                              )}
+                            </a>
+                          ))}
+                        </div>
+                      )
                     ) : (
                       <div className="flex items-center justify-between py-2 text-zinc-600 text-xs font-mono uppercase">
                         <span>Link em preparação</span>

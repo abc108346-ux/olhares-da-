@@ -976,6 +976,7 @@ export const createDefault15Premios = (): PremioOlhares[] => {
       titulo: `Prêmio ${numStr}`,
       subtitulo: '',
       link: '',
+      links: [],
       imagem: '',
       descricao: '',
       ativo: true,
@@ -1090,12 +1091,28 @@ export const deletePremioOlharesFromDb = async (id: string): Promise<boolean> =>
 };
 
 export const savePremioOlharesToDb = async (premio: PremioOlhares): Promise<PremioOlhares> => {
+  // Normalize links array
+  let cleanLinks = Array.isArray(premio.links)
+    ? premio.links.map(l => ({
+        titulo: (l.titulo || '').trim(),
+        url: (l.url || '').trim()
+      })).filter(l => Boolean(l.url))
+    : [];
+
+  const legacyLink = (premio.link || '').trim();
+  if (cleanLinks.length === 0 && legacyLink) {
+    cleanLinks = [{ titulo: '', url: legacyLink }];
+  }
+
+  const primaryLink = cleanLinks[0]?.url || legacyLink;
+
   const finalPremio: PremioOlhares = {
     id: premio.id || `premio-${premio.ordem}`,
     ordem: Number(premio.ordem),
     titulo: (premio.titulo || '').trim(),
     subtitulo: (premio.subtitulo || '').trim(),
-    link: (premio.link || '').trim(),
+    link: primaryLink,
+    links: cleanLinks,
     imagem: (premio.imagem || '').trim(),
     descricao: (premio.descricao || '').trim(),
     ativo: premio.ativo !== false,
@@ -1122,6 +1139,7 @@ export const savePremioOlharesToDb = async (premio: PremioOlhares): Promise<Prem
       titulo: finalPremio.titulo,
       subtitulo: finalPremio.subtitulo || '',
       link: finalPremio.link || '',
+      links: finalPremio.links || [],
       imagem: finalPremio.imagem || '',
       descricao: finalPremio.descricao || '',
       ativo: finalPremio.ativo,
@@ -1137,17 +1155,33 @@ export const savePremioOlharesToDb = async (premio: PremioOlhares): Promise<Prem
 };
 
 export const saveAllPremiosOlharesToDb = async (premios: PremioOlhares[]): Promise<PremioOlhares[]> => {
-  const sanitized = premios.map((p, idx) => ({
-    id: p.id || `premio-${p.ordem || idx + 1}`,
-    ordem: p.ordem || idx + 1,
-    titulo: (p.titulo || '').trim() || `Prêmio ${idx + 1 < 10 ? '0' : ''}${idx + 1}`,
-    subtitulo: (p.subtitulo || '').trim(),
-    link: (p.link || '').trim(),
-    imagem: (p.imagem || '').trim(),
-    descricao: (p.descricao || '').trim(),
-    ativo: p.ativo !== false,
-    atualizadoEm: new Date().toISOString(),
-  }));
+  const sanitized = premios.map((p, idx) => {
+    let cleanLinks = Array.isArray(p.links)
+      ? p.links.map(l => ({
+          titulo: (l.titulo || '').trim(),
+          url: (l.url || '').trim()
+        })).filter(l => Boolean(l.url))
+      : [];
+
+    const legacyLink = (p.link || '').trim();
+    if (cleanLinks.length === 0 && legacyLink) {
+      cleanLinks = [{ titulo: '', url: legacyLink }];
+    }
+    const primaryLink = cleanLinks[0]?.url || legacyLink;
+
+    return {
+      id: p.id || `premio-${p.ordem || idx + 1}`,
+      ordem: p.ordem || idx + 1,
+      titulo: (p.titulo || '').trim() || `Prêmio ${idx + 1 < 10 ? '0' : ''}${idx + 1}`,
+      subtitulo: (p.subtitulo || '').trim(),
+      link: primaryLink,
+      links: cleanLinks,
+      imagem: (p.imagem || '').trim(),
+      descricao: (p.descricao || '').trim(),
+      ativo: p.ativo !== false,
+      atualizadoEm: new Date().toISOString(),
+    };
+  });
 
   setLocalPremiosOlhares(sanitized);
 

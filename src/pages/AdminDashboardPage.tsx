@@ -815,6 +815,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       titulo: `Prêmio ${numStr}`,
       subtitulo: '',
       link: '',
+      links: [{ url: '', titulo: '' }],
       imagem: '',
       descricao: '',
       ativo: true,
@@ -838,6 +839,74 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }, 150);
+  };
+
+  const handleAddLinkToPremio = (premioIdx: number) => {
+    setPremios((prev) => {
+      const updated = [...prev];
+      const item = updated[premioIdx];
+      if (!item) return prev;
+
+      const currentLinks = Array.isArray(item.links) && item.links.length > 0
+        ? [...item.links]
+        : (item.link ? [{ url: item.link, titulo: '' }] : []);
+
+      currentLinks.push({ url: '', titulo: '' });
+      updated[premioIdx] = {
+        ...item,
+        links: currentLinks,
+        link: currentLinks[0]?.url || item.link || '',
+      };
+      return updated;
+    });
+  };
+
+  const handleUpdatePremioLink = (premioIdx: number, linkIdx: number, field: 'url' | 'titulo', value: string) => {
+    setPremios((prev) => {
+      const updated = [...prev];
+      const item = updated[premioIdx];
+      if (!item) return prev;
+
+      const currentLinks = Array.isArray(item.links) && item.links.length > 0
+        ? [...item.links]
+        : (item.link ? [{ url: item.link, titulo: '' }] : [{ url: '', titulo: '' }]);
+
+      if (!currentLinks[linkIdx]) {
+        currentLinks[linkIdx] = { url: '', titulo: '' };
+      }
+      currentLinks[linkIdx] = { ...currentLinks[linkIdx], [field]: value };
+
+      const firstValidUrl = currentLinks.find(l => l.url.trim())?.url || currentLinks[0]?.url || '';
+
+      updated[premioIdx] = {
+        ...item,
+        links: currentLinks,
+        link: firstValidUrl,
+      };
+      return updated;
+    });
+  };
+
+  const handleRemovePremioLink = (premioIdx: number, linkIdx: number) => {
+    setPremios((prev) => {
+      const updated = [...prev];
+      const item = updated[premioIdx];
+      if (!item) return prev;
+
+      const currentLinks = Array.isArray(item.links) && item.links.length > 0
+        ? [...item.links]
+        : (item.link ? [{ url: item.link, titulo: '' }] : []);
+
+      currentLinks.splice(linkIdx, 1);
+      const firstValidUrl = currentLinks[0]?.url || '';
+
+      updated[premioIdx] = {
+        ...item,
+        links: currentLinks,
+        link: firstValidUrl,
+      };
+      return updated;
+    });
   };
 
   const handleRequestDeletePremio = (premio: PremioOlhares) => {
@@ -1248,7 +1317,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   {premios.length}
                 </p>
                 <p className="text-[10px] font-mono text-zinc-500">
-                  {premios.filter(p => p.link).length}/{premios.length} com links
+                  {premios.filter(p => (p.links && p.links.some(l => l.url && l.url.trim())) || (p.link && p.link.trim())).length}/{premios.length} com links
                 </p>
               </div>
 
@@ -2704,19 +2773,78 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                           />
                         </div>
 
-                        <div className="space-y-1.5">
-                          <label className="block text-xs uppercase font-mono tracking-wider text-zinc-300">
-                            Link do Prêmio (Interno ou Externo)
-                          </label>
-                          <input
-                            type="text"
-                            value={premio.link}
-                            onChange={(e) => handleUpdatePremioField(idx, 'link', e.target.value)}
-                            placeholder="Ex: /criticas/o-som-da-cena ou https://..."
-                            className="w-full bg-black border border-zinc-800 p-2.5 text-white text-sm font-mono focus:border-amber-400 focus:outline-none"
-                          />
+                        {/* Multiple Links Manager */}
+                        <div className="space-y-3 pt-2 border-t border-zinc-900">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs uppercase font-mono tracking-wider text-zinc-300 flex items-center gap-1.5">
+                              <LinkIcon className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Links do Prêmio {((premio.links && premio.links.length > 0) ? premio.links : (premio.link ? [1] : [])).length > 0 ? `(${((premio.links && premio.links.length > 0) ? premio.links : [1]).length})` : ''}</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => handleAddLinkToPremio(idx)}
+                              className="px-2.5 py-1 bg-zinc-900 hover:bg-amber-400 hover:text-black text-amber-400 border border-zinc-800 hover:border-amber-400 text-[10px] font-mono uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer font-bold"
+                            >
+                              <PlusCircle className="w-3 h-3" />
+                              <span>+ Adicionar Link</span>
+                            </button>
+                          </div>
+
+                          <div className="space-y-2.5">
+                            {(() => {
+                              const currentLinks = (Array.isArray(premio.links) && premio.links.length > 0)
+                                ? premio.links
+                                : (premio.link ? [{ url: premio.link, titulo: '' }] : [{ url: '', titulo: '' }]);
+
+                              return currentLinks.map((linkItem, linkIdx) => (
+                                <div key={linkIdx} className="p-2.5 bg-black border border-zinc-850 hover:border-zinc-750 transition-colors space-y-2">
+                                  <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
+                                    <span className="font-semibold text-amber-400 flex items-center gap-1">
+                                      <span>Link #{linkIdx + 1}</span>
+                                      {linkIdx === 0 && (
+                                        <span className="text-[9px] text-zinc-500 font-normal">(Principal)</span>
+                                      )}
+                                    </span>
+                                    {currentLinks.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemovePremioLink(idx, linkIdx)}
+                                        className="text-zinc-500 hover:text-red-400 flex items-center gap-1 text-[10px] cursor-pointer transition-colors"
+                                        title="Remover este link"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                        <span>Remover</span>
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                                    <div className="sm:col-span-5">
+                                      <input
+                                        type="text"
+                                        value={linkItem.titulo || ''}
+                                        onChange={(e) => handleUpdatePremioLink(idx, linkIdx, 'titulo', e.target.value)}
+                                        placeholder="Nome/Rótulo (ex: Crítica)"
+                                        className="w-full bg-zinc-950 border border-zinc-800 p-2 text-white text-xs focus:border-amber-400 focus:outline-none"
+                                      />
+                                    </div>
+                                    <div className="sm:col-span-7">
+                                      <input
+                                        type="text"
+                                        value={linkItem.url}
+                                        onChange={(e) => handleUpdatePremioLink(idx, linkIdx, 'url', e.target.value)}
+                                        placeholder="URL (ex: /criticas/slug ou https://...)"
+                                        className="w-full bg-zinc-950 border border-zinc-800 p-2 text-white text-xs font-mono focus:border-amber-400 focus:outline-none"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ));
+                            })()}
+                          </div>
+
                           <p className="text-[11px] font-mono text-zinc-500">
-                            Cole o link da crítica no site (ex: <code className="text-zinc-400">/criticas/slug-da-critica</code>) ou um link externo (<code className="text-zinc-400">https://...</code>).
+                            Adicione múltiplos links por prêmio (ex: críticas no site, matérias, vídeos do espetáculo, redes sociais).
                           </p>
                         </div>
 
