@@ -13,14 +13,15 @@ export const PremioOlharesPage: React.FC<PremioOlharesPageProps> = ({
   onNavigate,
   isAdmin = false
 }) => {
-  // Sort by order 1 to 15
+  // Sort by order
   const sortedPremios = useMemo(() => {
-    // Ensure all 15 slots are present even if some haven't been saved yet
+    if (premios && premios.length > 0) {
+      return [...premios].sort((a, b) => a.ordem - b.ordem);
+    }
+    // Ensure default 15 slots if completely empty
     const slots: PremioOlhares[] = Array.from({ length: 15 }, (_, idx) => {
       const num = idx + 1;
       const numStr = num < 10 ? `0${num}` : `${num}`;
-      const found = premios.find(p => p.ordem === num || p.id === `premio-${num}`);
-      if (found) return found;
       return {
         id: `premio-${num}`,
         ordem: num,
@@ -32,7 +33,7 @@ export const PremioOlharesPage: React.FC<PremioOlharesPageProps> = ({
         ativo: true,
       };
     });
-    return slots.sort((a, b) => a.ordem - b.ordem);
+    return slots;
   }, [premios]);
 
   const handleLinkClick = (e: React.MouseEvent, link: string) => {
@@ -58,7 +59,7 @@ export const PremioOlharesPage: React.FC<PremioOlharesPageProps> = ({
         <div className="max-w-6xl mx-auto text-center relative z-10 space-y-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs font-mono uppercase tracking-[0.25em]">
             <Trophy className="w-3.5 h-3.5 text-amber-400" />
-            <span>Edição Especial • 15 Prêmios</span>
+            <span>Edição Especial • {sortedPremios.length} Prêmios</span>
           </div>
 
           <h1 className="font-serif text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-white uppercase max-w-4xl mx-auto leading-[1.1]">
@@ -67,7 +68,7 @@ export const PremioOlharesPage: React.FC<PremioOlharesPageProps> = ({
 
           <p className="text-zinc-400 text-sm sm:text-base md:text-lg max-w-2xl mx-auto font-light leading-relaxed">
             Celebrando a inventividade, o vigor estético e o impacto social das artes cênicas. 
-            Acompanhe aqui a seleção de cada um dos nossos 15 prêmios e destaques teatrais.
+            Acompanhe aqui a seleção de cada um dos nossos prêmios e destaques teatrais.
           </p>
 
           {isAdmin && (
@@ -84,17 +85,17 @@ export const PremioOlharesPage: React.FC<PremioOlharesPageProps> = ({
         </div>
       </section>
 
-      {/* Grid of 15 Awards */}
+      {/* Grid of Awards */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-8">
           <div className="flex items-center gap-2.5">
             <Award className="w-5 h-5 text-amber-400" />
             <h2 className="font-serif text-lg sm:text-xl font-bold uppercase tracking-wider text-white">
-              Galeria dos 15 Prêmios
+              Galeria de Prêmios
             </h2>
           </div>
           <span className="text-xs font-mono text-zinc-500 uppercase tracking-widest">
-            15 Espaços
+            {sortedPremios.length} {sortedPremios.length === 1 ? 'Prêmio' : 'Prêmios'}
           </span>
         </div>
 

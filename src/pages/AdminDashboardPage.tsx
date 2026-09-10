@@ -18,6 +18,7 @@ import {
   deleteSiteInteressanteFromDb,
   savePremioOlharesToDb,
   saveAllPremiosOlharesToDb,
+  deletePremioOlharesFromDb,
   getLocalPremiosOlhares,
   seedDatabaseIfEmpty, 
   logoutAdminUser,
@@ -802,6 +803,63 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   const [savingPremioIndex, setSavingPremioIndex] = useState<number | null>(null);
   const [savingAllPremios, setSavingAllPremios] = useState(false);
   const [premioImageMode, setPremioImageMode] = useState<Record<number, 'url' | 'upload'>>({});
+  const [deletePremioModalOpen, setDeletePremioModalOpen] = useState(false);
+  const [premioToDelete, setPremioToDelete] = useState<PremioOlhares | null>(null);
+
+  const handleAddPremio = async () => {
+    const nextOrdem = premios.length > 0 ? Math.max(...premios.map(p => p.ordem || 0)) + 1 : 1;
+    const numStr = nextOrdem < 10 ? `0${nextOrdem}` : `${nextOrdem}`;
+    const newPremio: PremioOlhares = {
+      id: `premio-${Date.now()}`,
+      ordem: nextOrdem,
+      titulo: `Prêmio ${numStr}`,
+      subtitulo: '',
+      link: '',
+      imagem: '',
+      descricao: '',
+      ativo: true,
+      atualizadoEm: new Date().toISOString(),
+    };
+
+    const nextPremios = [...premios, newPremio];
+    setPremios(nextPremios);
+    onPremiosChange?.(nextPremios);
+
+    try {
+      await savePremioOlharesToDb(newPremio);
+      showNotification(`Prêmio #${nextOrdem} adicionado com sucesso!`);
+    } catch {
+      showNotification(`Prêmio #${nextOrdem} adicionado localmente.`);
+    }
+
+    setTimeout(() => {
+      const el = document.getElementById(`admin-premio-slot-${nextPremios.length}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 150);
+  };
+
+  const handleRequestDeletePremio = (premio: PremioOlhares) => {
+    setPremioToDelete(premio);
+    setDeletePremioModalOpen(true);
+  };
+
+  const handleConfirmDeletePremio = async () => {
+    if (!premioToDelete) return;
+    try {
+      await deletePremioOlharesFromDb(premioToDelete.id);
+      const nextPremios = premios.filter(p => p.id !== premioToDelete.id);
+      setPremios(nextPremios);
+      onPremiosChange?.(nextPremios);
+      showNotification(`Prêmio #${premioToDelete.ordem} excluído com sucesso.`);
+    } catch {
+      showNotification('Erro ao excluir prêmio.', 'error');
+    } finally {
+      setDeletePremioModalOpen(false);
+      setPremioToDelete(null);
+    }
+  };
 
   const handleUpdatePremioField = (index: number, field: keyof PremioOlhares, value: any) => {
     setPremios((prev) => {
@@ -1187,10 +1245,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   <Trophy className="w-3 h-3 text-amber-400" />
                 </span>
                 <p className="font-serif text-3xl font-bold text-white">
-                  15
+                  {premios.length}
                 </p>
                 <p className="text-[10px] font-mono text-zinc-500">
-                  {premios.filter(p => p.link).length}/15 com links
+                  {premios.filter(p => p.link).length}/{premios.length} com links
                 </p>
               </div>
 
@@ -2491,7 +2549,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         )}
 
         {/* ==========================================================
-            VIEW: PRÊMIO OLHARES DA CENA (15 ESPAÇOS)
+            VIEW: PRÊMIO OLHARES DA CENA (GESTÃO DINÂMICA)
            ========================================================== */}
         {activeView === 'premios-olhares' && (
           <div className="space-y-8 max-w-6xl animate-in fade-in">
@@ -2500,17 +2558,28 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
               <div>
                 <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-mono uppercase tracking-wider mb-2">
                   <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                  <span>15 Espaços de Prêmios Catalogados</span>
+                  <span>{premios.length} {premios.length === 1 ? 'Prêmio Catalogado' : 'Prêmios Catalogados'}</span>
                 </div>
                 <h1 className="font-serif text-3xl font-bold uppercase text-white tracking-tight">
                   Prêmio Olhares da Cena
                 </h1>
                 <p className="text-xs font-mono text-zinc-400 mt-1">
-                  Configure o título, link e imagem para cada um dos 15 prêmios. A imagem pode ser por URL direta ou anexada do seu dispositivo.
+                  Configure o título, link e imagem para cada um dos prêmios. Adicione novos prêmios ou exclua os que desejar.
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  id="btn-admin-add-premio"
+                  onClick={handleAddPremio}
+                  className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-black font-bold uppercase tracking-wider text-xs transition-colors flex items-center gap-2 cursor-pointer shadow-md shadow-amber-500/20"
+                  title="Criar um novo prêmio"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Adicionar Prêmio</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => onNavigate('/premio-olhares-da-cena')}
@@ -2525,7 +2594,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   type="button"
                   onClick={handleSaveAllPremios}
                   disabled={savingAllPremios}
-                  className="px-6 py-2.5 bg-white text-black font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 bg-white text-black font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {savingAllPremios ? (
                     <>
@@ -2535,14 +2604,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   ) : (
                     <>
                       <Save className="w-4 h-4" />
-                      <span>SALVAR TODOS OS 15 PRÊMIOS</span>
+                      <span>SALVAR TODOS ({premios.length})</span>
                     </>
                   )}
                 </button>
               </div>
             </div>
 
-            {/* List of 15 Award Slots */}
+            {/* List of Award Slots */}
             <div className="space-y-6">
               {premios.map((premio, idx) => {
                 const mode = premioImageMode[idx] || 'url';
@@ -2566,7 +2635,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                         </h3>
                       </div>
 
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 sm:gap-4">
                         {/* Active toggle */}
                         <label className="flex items-center gap-2 text-xs font-mono cursor-pointer text-zinc-300">
                           <input
@@ -2591,6 +2660,16 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                             <Check className="w-3 h-3 text-amber-400" />
                           )}
                           <span>{isSavingThis ? 'Salvando...' : 'Salvar este'}</span>
+                        </button>
+
+                        {/* Delete single slot */}
+                        <button
+                          type="button"
+                          onClick={() => handleRequestDeletePremio(premio)}
+                          className="p-1.5 bg-zinc-900 hover:bg-red-950/60 text-zinc-400 hover:text-red-400 border border-zinc-800 hover:border-red-800 text-xs transition-colors cursor-pointer"
+                          title="Excluir este prêmio"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -2748,36 +2827,57 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   </div>
                 );
               })}
+
+              {/* Add New Award Card / Button at bottom of list */}
+              <button
+                type="button"
+                id="btn-admin-add-premio-bottom"
+                onClick={handleAddPremio}
+                className="w-full py-5 border border-dashed border-zinc-800 hover:border-amber-400/80 hover:bg-amber-500/5 text-zinc-400 hover:text-amber-300 font-mono text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 cursor-pointer group"
+              >
+                <PlusCircle className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                <span>+ Adicionar Novo Prêmio (Prêmio #{premios.length + 1 < 10 ? `0${premios.length + 1}` : premios.length + 1})</span>
+              </button>
             </div>
 
             {/* Bottom Save All Banner */}
-            <div className="flex items-center justify-between p-6 bg-zinc-950 border border-zinc-800">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-zinc-950 border border-zinc-800">
               <div>
                 <h4 className="font-serif text-base font-bold text-white uppercase">
-                  Pronto para atualizar os 15 prêmios?
+                  Pronto para salvar os {premios.length} prêmios?
                 </h4>
                 <p className="text-xs font-mono text-zinc-400">
                   Clique para sincronizar todas as informações e imagens com o banco de dados.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={handleSaveAllPremios}
-                disabled={savingAllPremios}
-                className="px-6 py-3 bg-white text-black font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {savingAllPremios ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>SALVANDO...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    <span>SALVAR TODOS OS PRÊMIOS</span>
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleAddPremio}
+                  className="flex-1 sm:flex-none px-4 py-3 bg-zinc-900 hover:bg-zinc-800 text-amber-400 border border-zinc-800 font-mono text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Adicionar Mais Um</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveAllPremios}
+                  disabled={savingAllPremios}
+                  className="flex-1 sm:flex-none px-6 py-3 bg-white text-black font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {savingAllPremios ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>SALVANDO...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>SALVAR TODOS ({premios.length})</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -3142,6 +3242,20 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         onCancel={() => {
           setDeleteSiteModalOpen(false);
           setSiteToDelete(null);
+        }}
+      />
+
+      {/* Delete Confirmation Modal for Premio Olhares */}
+      <ModalConfirm
+        isOpen={deletePremioModalOpen}
+        title="Excluir Prêmio"
+        message={`Tem certeza que deseja remover o Prêmio #${premioToDelete?.ordem} - "${premioToDelete?.titulo}"? Ele deixará de ser exibido na lista de prêmios.`}
+        confirmText="Sim, Excluir Prêmio"
+        cancelText="Cancelar"
+        onConfirm={handleConfirmDeletePremio}
+        onCancel={() => {
+          setDeletePremioModalOpen(false);
+          setPremioToDelete(null);
         }}
       />
 

@@ -990,13 +990,7 @@ export const getLocalPremiosOlhares = (): PremioOlhares[] => {
     if (cached) {
       const parsed = JSON.parse(cached);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Ensure all 15 slots exist
-        const defaults = createDefault15Premios();
-        const merged = defaults.map((defSlot) => {
-          const found = parsed.find((p: any) => p.ordem === defSlot.ordem || p.id === defSlot.id);
-          return found ? { ...defSlot, ...found } : defSlot;
-        });
-        return merged.sort((a, b) => a.ordem - b.ordem);
+        return parsed.sort((a, b) => a.ordem - b.ordem);
       }
     }
   } catch (e) {
@@ -1024,16 +1018,9 @@ export const fetchPremiosOlhares = async (): Promise<PremioOlhares[]> => {
         list.push({ id: docSnap.id, ...(docSnap.data() as any) });
       });
 
-      // Merge with 15 slots in case some are missing
-      const defaults = createDefault15Premios();
-      const merged = defaults.map((defSlot) => {
-        const found = list.find(p => p.ordem === defSlot.ordem || p.id === defSlot.id);
-        return found ? { ...defSlot, ...found } : defSlot;
-      });
-      merged.sort((a, b) => a.ordem - b.ordem);
-
-      setLocalPremiosOlhares(merged);
-      return merged;
+      list.sort((a, b) => a.ordem - b.ordem);
+      setLocalPremiosOlhares(list);
+      return list;
     } else {
       // Initialize 15 empty award slots in Firestore
       const initial = createDefault15Premios();
@@ -1067,14 +1054,9 @@ export const subscribeToPremiosOlhares = (
           snapshot.forEach((docSnap) => {
             list.push({ id: docSnap.id, ...(docSnap.data() as any) });
           });
-          const defaults = createDefault15Premios();
-          const merged = defaults.map((defSlot) => {
-            const found = list.find(p => p.ordem === defSlot.ordem || p.id === defSlot.id);
-            return found ? { ...defSlot, ...found } : defSlot;
-          });
-          merged.sort((a, b) => a.ordem - b.ordem);
-          setLocalPremiosOlhares(merged);
-          callback(merged);
+          list.sort((a, b) => a.ordem - b.ordem);
+          setLocalPremiosOlhares(list);
+          callback(list);
         } else {
           callback(getLocalPremiosOlhares());
         }
@@ -1089,6 +1071,21 @@ export const subscribeToPremiosOlhares = (
     console.warn('Could not establish subscription for premios_olhares:', err);
     callback(getLocalPremiosOlhares());
     return () => {};
+  }
+};
+
+export const deletePremioOlharesFromDb = async (id: string): Promise<boolean> => {
+  try {
+    const local = getLocalPremiosOlhares().filter(p => p.id !== id);
+    setLocalPremiosOlhares(local);
+
+    const docRef = doc(db, 'premios_olhares', id);
+    await deleteDoc(docRef);
+    console.log(`Prêmio ${id} excluído com sucesso do Firestore.`);
+    return true;
+  } catch (err) {
+    console.warn('Could not delete premio from Firestore, kept local update:', err);
+    return true;
   }
 };
 
