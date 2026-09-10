@@ -6,7 +6,8 @@ import {
   FichaTecnica as FichaTecnicaType,
   Pagina,
   SiteStats,
-  SiteInteressante
+  SiteInteressante,
+  PremioOlhares
 } from '../types';
 import { 
   saveCriticaToDb, 
@@ -15,6 +16,9 @@ import {
   deletePaginaFromDb,
   saveSiteInteressanteToDb,
   deleteSiteInteressanteFromDb,
+  savePremioOlharesToDb,
+  saveAllPremiosOlharesToDb,
+  getLocalPremiosOlhares,
   seedDatabaseIfEmpty, 
   logoutAdminUser,
   getHomeSettings,
@@ -56,23 +60,27 @@ import {
   FileCode2,
   Compass,
   ArrowUpRight,
-  Globe
+  Globe,
+  Trophy,
+  Upload,
+  Link as LinkIcon
 } from 'lucide-react';
-import { generateSitemapXml, downloadSitemapXmlFile } from '../utils/sitemap';
 
 interface AdminDashboardPageProps {
   currentUser: UserProfile;
   criticas: Critica[];
   paginas?: Pagina[];
   sitesInteressantes?: SiteInteressante[];
+  premiosOlhares?: PremioOlhares[];
   onCriticasChange: (criticas: Critica[]) => void;
   onPaginasChange?: (paginas: Pagina[]) => void;
   onSitesChange?: (sites: SiteInteressante[]) => void;
+  onPremiosChange?: (premios: PremioOlhares[]) => void;
   onNavigate: (path: string) => void;
   onSelectCritica: (slug: string) => void;
 }
 
-type AdminView = 'dashboard' | 'criticas' | 'nova-critica' | 'editar-critica' | 'paginas' | 'nova-pagina' | 'editar-pagina' | 'categorias' | 'sites-interessantes' | 'midia' | 'configuracoes' | 'home-settings';
+type AdminView = 'dashboard' | 'criticas' | 'nova-critica' | 'editar-critica' | 'paginas' | 'nova-pagina' | 'editar-pagina' | 'categorias' | 'sites-interessantes' | 'premios-olhares' | 'midia' | 'configuracoes' | 'home-settings';
 
 const CATEGORIAS_PADRAO: CategoriaTipo[] = [
   'Teatro',
@@ -99,9 +107,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   criticas,
   paginas = [],
   sitesInteressantes = [],
+  premiosOlhares = [],
   onCriticasChange,
   onPaginasChange,
   onSitesChange,
+  onPremiosChange,
   onNavigate,
   onSelectCritica,
 }) => {
@@ -775,6 +785,85 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
     }
   };
 
+  // ==========================================
+  // PRÊMIO OLHARES DA CENA STATE & HANDLERS (15 ESPAÇOS)
+  // ==========================================
+  const [premios, setPremios] = useState<PremioOlhares[]>(() => {
+    if (premiosOlhares && premiosOlhares.length > 0) return premiosOlhares;
+    return getLocalPremiosOlhares();
+  });
+
+  useEffect(() => {
+    if (premiosOlhares && premiosOlhares.length > 0) {
+      setPremios(premiosOlhares);
+    }
+  }, [premiosOlhares]);
+
+  const [savingPremioIndex, setSavingPremioIndex] = useState<number | null>(null);
+  const [savingAllPremios, setSavingAllPremios] = useState(false);
+  const [premioImageMode, setPremioImageMode] = useState<Record<number, 'url' | 'upload'>>({});
+
+  const handleUpdatePremioField = (index: number, field: keyof PremioOlhares, value: any) => {
+    setPremios((prev) => {
+      const updated = [...prev];
+      if (updated[index]) {
+        updated[index] = { ...updated[index], [field]: value };
+      }
+      return updated;
+    });
+  };
+
+  const handleSaveSinglePremio = async (index: number) => {
+    const item = premios[index];
+    if (!item) return;
+    setSavingPremioIndex(index);
+    try {
+      const saved = await savePremioOlharesToDb(item);
+      const nextPremios = [...premios];
+      nextPremios[index] = saved;
+      setPremios(nextPremios);
+      onPremiosChange?.(nextPremios);
+      showNotification(`Prêmio #${item.ordem} salvo com sucesso!`);
+    } catch {
+      showNotification(`Erro ao salvar Prêmio #${item.ordem}.`, 'error');
+    } finally {
+      setSavingPremioIndex(null);
+    }
+  };
+
+  const handleSaveAllPremios = async () => {
+    setSavingAllPremios(true);
+    try {
+      const savedList = await saveAllPremiosOlharesToDb(premios);
+      setPremios(savedList);
+      onPremiosChange?.(savedList);
+      showNotification('Todos os 15 espaços do Prêmio Olhares da Cena foram salvos com sucesso!');
+    } catch {
+      showNotification('Erro ao salvar prêmios.', 'error');
+    } finally {
+      setSavingAllPremios(false);
+    }
+  };
+
+  const handlePremioFileUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification('A imagem deve ter no máximo 5MB.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      handleUpdatePremioField(index, 'imagem', base64);
+      showNotification(`Imagem anexada ao Prêmio #${index + 1}!`);
+    };
+    reader.onerror = () => {
+      showNotification('Erro ao processar imagem.', 'error');
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div id="admin-dashboard-page" className="min-h-screen bg-black text-white flex flex-col md:flex-row">
       
@@ -902,6 +991,17 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
             >
               <Globe className="w-4 h-4" />
               <span>SITES INTERESSANTES</span>
+            </button>
+
+            <button
+              id="admin-nav-premios-olhares"
+              onClick={() => { setActiveView('premios-olhares'); setMobileSidebarOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors cursor-pointer ${
+                activeView === 'premios-olhares' ? 'bg-white text-black font-bold' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+              }`}
+            >
+              <Trophy className="w-4 h-4 text-amber-400" />
+              <span>PRÊMIO OLHARES</span>
             </button>
 
             <button
@@ -1074,6 +1174,23 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 </p>
                 <p className="text-[10px] font-mono text-zinc-500">
                   {sites.filter(s => s.ativo).length} ativos
+                </p>
+              </div>
+
+              <div 
+                onClick={() => setActiveView('premios-olhares')}
+                className="p-5 bg-zinc-950 border border-zinc-850 space-y-1 hover:border-amber-500/50 cursor-pointer transition-colors"
+                title="Gerenciar 15 Prêmios Olhares da Cena"
+              >
+                <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 flex items-center justify-between">
+                  <span>PRÊMIOS</span>
+                  <Trophy className="w-3 h-3 text-amber-400" />
+                </span>
+                <p className="font-serif text-3xl font-bold text-white">
+                  15
+                </p>
+                <p className="text-[10px] font-mono text-zinc-500">
+                  {premios.filter(p => p.link).length}/15 com links
                 </p>
               </div>
 
@@ -2374,6 +2491,298 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         )}
 
         {/* ==========================================================
+            VIEW: PRÊMIO OLHARES DA CENA (15 ESPAÇOS)
+           ========================================================== */}
+        {activeView === 'premios-olhares' && (
+          <div className="space-y-8 max-w-6xl animate-in fade-in">
+            {/* Header & Global Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-850 pb-6">
+              <div>
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-mono uppercase tracking-wider mb-2">
+                  <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                  <span>15 Espaços de Prêmios Catalogados</span>
+                </div>
+                <h1 className="font-serif text-3xl font-bold uppercase text-white tracking-tight">
+                  Prêmio Olhares da Cena
+                </h1>
+                <p className="text-xs font-mono text-zinc-400 mt-1">
+                  Configure o título, link e imagem para cada um dos 15 prêmios. A imagem pode ser por URL direta ou anexada do seu dispositivo.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('/premio-olhares-da-cena')}
+                  className="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-xs font-mono uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer"
+                  title="Abrir página pública do prêmio"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Ver no Site</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveAllPremios}
+                  disabled={savingAllPremios}
+                  className="px-6 py-2.5 bg-white text-black font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {savingAllPremios ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>SALVANDO...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>SALVAR TODOS OS 15 PRÊMIOS</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* List of 15 Award Slots */}
+            <div className="space-y-6">
+              {premios.map((premio, idx) => {
+                const mode = premioImageMode[idx] || 'url';
+                const formattedNum = premio.ordem < 10 ? `0${premio.ordem}` : `${premio.ordem}`;
+                const isSavingThis = savingPremioIndex === idx;
+
+                return (
+                  <div
+                    key={premio.id || `premio-slot-${idx}`}
+                    id={`admin-premio-slot-${idx + 1}`}
+                    className="p-6 bg-zinc-950 border border-zinc-850 hover:border-zinc-700 transition-all space-y-6"
+                  >
+                    {/* Slot Header Bar */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-850 pb-4">
+                      <div className="flex items-center gap-3">
+                        <span className="px-3 py-1 bg-black border border-amber-500/40 text-amber-300 font-mono text-xs font-bold uppercase tracking-widest">
+                          ESPAÇO #{formattedNum}
+                        </span>
+                        <h3 className="font-serif text-lg font-bold text-white uppercase">
+                          {premio.titulo || `Prêmio ${formattedNum}`}
+                        </h3>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        {/* Active toggle */}
+                        <label className="flex items-center gap-2 text-xs font-mono cursor-pointer text-zinc-300">
+                          <input
+                            type="checkbox"
+                            checked={premio.ativo}
+                            onChange={(e) => handleUpdatePremioField(idx, 'ativo', e.target.checked)}
+                            className="w-4 h-4 bg-black border-zinc-700 text-white rounded cursor-pointer"
+                          />
+                          <span>Exibir no Site</span>
+                        </label>
+
+                        {/* Save single slot */}
+                        <button
+                          type="button"
+                          onClick={() => handleSaveSinglePremio(idx)}
+                          disabled={isSavingThis}
+                          className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 text-xs font-mono uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {isSavingThis ? (
+                            <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
+                          ) : (
+                            <Check className="w-3 h-3 text-amber-400" />
+                          )}
+                          <span>{isSavingThis ? 'Salvando...' : 'Salvar este'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Inputs Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Left: Texts and Link */}
+                      <div className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="block text-xs uppercase font-mono tracking-wider text-zinc-300">
+                            Título / Categoria do Prêmio <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={premio.titulo}
+                            onChange={(e) => handleUpdatePremioField(idx, 'titulo', e.target.value)}
+                            placeholder={`Ex: Prêmio ${formattedNum} - Melhor Espetáculo`}
+                            className="w-full bg-black border border-zinc-800 p-2.5 text-white text-sm focus:border-amber-400 focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-xs uppercase font-mono tracking-wider text-zinc-300">
+                            Subtítulo / Categoria (Opcional)
+                          </label>
+                          <input
+                            type="text"
+                            value={premio.subtitulo || ''}
+                            onChange={(e) => handleUpdatePremioField(idx, 'subtitulo', e.target.value)}
+                            placeholder="Ex: Temporada 2025 • Vencedor Oficial"
+                            className="w-full bg-black border border-zinc-800 p-2.5 text-white text-sm focus:border-amber-400 focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-xs uppercase font-mono tracking-wider text-zinc-300">
+                            Link do Prêmio (Interno ou Externo)
+                          </label>
+                          <input
+                            type="text"
+                            value={premio.link}
+                            onChange={(e) => handleUpdatePremioField(idx, 'link', e.target.value)}
+                            placeholder="Ex: /criticas/o-som-da-cena ou https://..."
+                            className="w-full bg-black border border-zinc-800 p-2.5 text-white text-sm font-mono focus:border-amber-400 focus:outline-none"
+                          />
+                          <p className="text-[11px] font-mono text-zinc-500">
+                            Cole o link da crítica no site (ex: <code className="text-zinc-400">/criticas/slug-da-critica</code>) ou um link externo (<code className="text-zinc-400">https://...</code>).
+                          </p>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-xs uppercase font-mono tracking-wider text-zinc-300">
+                            Descrição / Justificativa (Opcional)
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={premio.descricao || ''}
+                            onChange={(e) => handleUpdatePremioField(idx, 'descricao', e.target.value)}
+                            placeholder="Breve texto sobre o espetáculo, indicação ou premiado..."
+                            className="w-full bg-black border border-zinc-800 p-2.5 text-white text-sm focus:border-amber-400 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Right: Image Manager (URL or Upload) */}
+                      <div className="space-y-3 bg-black/50 border border-zinc-850 p-4">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs uppercase font-mono tracking-wider text-zinc-300 flex items-center gap-2">
+                            <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Imagem do Prêmio</span>
+                          </label>
+
+                          {/* URL vs Upload Toggle */}
+                          <div className="flex items-center border border-zinc-800 bg-black text-[10px] font-mono">
+                            <button
+                              type="button"
+                              onClick={() => setPremioImageMode(prev => ({ ...prev, [idx]: 'url' }))}
+                              className={`px-2.5 py-1 uppercase transition-colors cursor-pointer ${
+                                mode === 'url' ? 'bg-white text-black font-bold' : 'text-zinc-400 hover:text-white'
+                              }`}
+                            >
+                              URL
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPremioImageMode(prev => ({ ...prev, [idx]: 'upload' }))}
+                              className={`px-2.5 py-1 uppercase transition-colors cursor-pointer ${
+                                mode === 'upload' ? 'bg-white text-black font-bold' : 'text-zinc-400 hover:text-white'
+                              }`}
+                            >
+                              Upload
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Image input based on mode */}
+                        {mode === 'url' ? (
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              value={premio.imagem}
+                              onChange={(e) => handleUpdatePremioField(idx, 'imagem', e.target.value)}
+                              placeholder="https://exemplo.com/imagem.jpg"
+                              className="w-full bg-black border border-zinc-800 p-2 text-white text-xs font-mono focus:border-amber-400 focus:outline-none"
+                            />
+                            <p className="text-[10px] font-mono text-zinc-500">
+                              Cole a URL direta da imagem (JPG, PNG, WebP).
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <label className="flex flex-col items-center justify-center border border-dashed border-zinc-700 hover:border-amber-400 p-4 bg-zinc-950 cursor-pointer transition-colors text-center">
+                              <Upload className="w-5 h-5 text-zinc-400 mb-1" />
+                              <span className="text-xs text-zinc-300 font-mono">Clique para selecionar imagem</span>
+                              <span className="text-[10px] text-zinc-500 font-mono mt-0.5">PNG, JPG, WebP até 5MB</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handlePremioFileUpload(idx, e)}
+                                className="hidden"
+                              />
+                            </label>
+                          </div>
+                        )}
+
+                        {/* Preview Box */}
+                        <div className="relative aspect-video w-full bg-zinc-900 border border-zinc-800 overflow-hidden flex items-center justify-center">
+                          {premio.imagem ? (
+                            <>
+                              <img
+                                src={premio.imagem}
+                                alt={premio.titulo}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleUpdatePremioField(idx, 'imagem', '')}
+                                className="absolute top-2 right-2 p-1.5 bg-black/80 hover:bg-red-950 text-zinc-400 hover:text-red-400 border border-zinc-700 text-xs transition-colors cursor-pointer"
+                                title="Remover imagem"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <div className="text-center p-4 text-zinc-600">
+                              <ImageIcon className="w-8 h-8 mx-auto mb-1 stroke-[1.2] text-zinc-700" />
+                              <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                                Sem imagem adicionada
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bottom Save All Banner */}
+            <div className="flex items-center justify-between p-6 bg-zinc-950 border border-zinc-800">
+              <div>
+                <h4 className="font-serif text-base font-bold text-white uppercase">
+                  Pronto para atualizar os 15 prêmios?
+                </h4>
+                <p className="text-xs font-mono text-zinc-400">
+                  Clique para sincronizar todas as informações e imagens com o banco de dados.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveAllPremios}
+                disabled={savingAllPremios}
+                className="px-6 py-3 bg-white text-black font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {savingAllPremios ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>SALVANDO...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>SALVAR TODOS OS PRÊMIOS</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ==========================================================
             VIEW: MÍDIA / IMAGENS
            ========================================================== */}
         {activeView === 'midia' && (
@@ -2662,49 +3071,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   A contagem é protegida por filtro de dispositivo único: visitas repetidas e atualizações de página pelo mesmo aparelho não aumentam a métrica.
                 </p>
               </form>
-            </div>
-
-            {/* Sitemap.xml & SEO Tool */}
-            <div className="bg-zinc-950 border border-zinc-800 p-6 space-y-4">
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <Globe className="w-4 h-4 text-zinc-300" />
-                  <h3 className="font-serif text-sm font-bold text-white uppercase tracking-wider">
-                    Sitemap.xml & Indexação SEO
-                  </h3>
-                </div>
-                <span className="text-[10px] font-mono text-zinc-500 uppercase">
-                  Google Search Console
-                </span>
-              </div>
-
-              <p className="text-xs text-zinc-400 font-light leading-relaxed">
-                O arquivo <code className="text-zinc-200 font-mono bg-zinc-900 px-1.5 py-0.5 border border-zinc-800">sitemap.xml</code> informa aos motores de busca (Google, Bing) todas as páginas, críticas e rotas catalogadas em Olhares da Cena.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const xml = generateSitemapXml(criticas, paginas);
-                    downloadSitemapXmlFile(xml);
-                    showNotification('sitemap.xml gerado e baixado com sucesso!');
-                  }}
-                  className="px-4 py-2 bg-white text-black font-mono font-semibold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-colors flex items-center gap-2 cursor-pointer"
-                >
-                  <FileCode2 className="w-3.5 h-3.5" />
-                  <span>Baixar sitemap.xml Atualizado</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onNavigate('/sitemap.xml')}
-                  className="px-4 py-2 bg-zinc-900 text-white border border-zinc-700 font-mono uppercase tracking-wider text-xs hover:bg-zinc-800 transition-colors flex items-center gap-2 cursor-pointer"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Abrir Visualizador do Sitemap</span>
-                </button>
-              </div>
             </div>
           </div>
         )}

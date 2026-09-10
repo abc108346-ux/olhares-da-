@@ -16,10 +16,18 @@ export const Header: React.FC<HeaderProps> = ({ currentPath, onNavigate, paginas
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
-  // Detect scroll to add subtle backdrop blur without shifting height
+  // Detect scroll with hysteresis to prevent jittering at position boundaries
   useEffect(() => {
+    let ticking = false;
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 15);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const scrollY = window.scrollY || 0;
+          setIsScrolled(scrollY > 20);
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
@@ -58,11 +66,12 @@ export const Header: React.FC<HeaderProps> = ({ currentPath, onNavigate, paginas
   const allNavItems = [
     { label: 'INÍCIO', path: '/' },
     { label: 'CRÍTICAS', path: '/criticas' },
+    { label: 'PRÊMIO OLHARES', path: '/premio-olhares-da-cena' },
     ...headerPages.map(p => ({ label: p.titulo.toUpperCase(), path: `/${p.slug}` })),
   ];
 
-  // Up to 3 items shown directly on tablet (md), 5 on desktop (lg/xl)
-  const MAX_DESKTOP_ITEMS = 4;
+  // Up to 3 items shown directly on tablet (md), 4 on desktop (lg/xl)
+  const MAX_DESKTOP_ITEMS = 3;
   const desktopVisibleItems = allNavItems.slice(0, MAX_DESKTOP_ITEMS);
   const desktopMoreItems = allNavItems.slice(MAX_DESKTOP_ITEMS);
 
@@ -76,17 +85,17 @@ export const Header: React.FC<HeaderProps> = ({ currentPath, onNavigate, paginas
   return (
     <header 
       id="main-header"
-      className={`sticky top-0 z-50 w-full transition-colors duration-200 border-b ${
+      className={`sticky top-0 z-50 w-full transition-all duration-200 border-b backdrop-blur-md ${
         isScrolled 
-          ? 'border-zinc-800/80 bg-black/95 backdrop-blur-md shadow-lg shadow-black/60' 
-          : 'border-zinc-900 bg-black'
+          ? 'border-zinc-800/90 bg-black/98 shadow-xl shadow-black/70' 
+          : 'border-zinc-900/80 bg-black/95'
       }`}
     >
       {/* 
         Fixed height container (h-16 on mobile, h-20 on desktop)
         Prevents layout shifts, jittering and bouncing at scroll position boundaries
       */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3 sm:gap-4">
         
         {/* Logo Brand Link */}
         <button 
@@ -99,15 +108,15 @@ export const Header: React.FC<HeaderProps> = ({ currentPath, onNavigate, paginas
         </button>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-4 lg:gap-6 xl:gap-8 shrink-0">
+        <nav className="hidden md:flex items-center gap-3 lg:gap-5 xl:gap-7 shrink-0">
           {desktopVisibleItems.map((item) => {
             const isActive = currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path));
             return (
               <button
                 key={item.path}
-                id={`nav-link-${item.label.toLowerCase()}`}
+                id={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                 onClick={() => handleNavClick(item.path)}
-                className={`text-xs uppercase tracking-[0.2em] font-medium transition-colors duration-150 relative py-1.5 cursor-pointer whitespace-nowrap ${
+                className={`text-xs uppercase tracking-[0.18em] font-medium transition-colors duration-150 relative py-1.5 cursor-pointer whitespace-nowrap ${
                   isActive 
                     ? 'text-white font-semibold' 
                     : 'text-zinc-400 hover:text-white'
@@ -126,7 +135,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath, onNavigate, paginas
             <div className="relative" ref={moreMenuRef}>
               <button
                 id="header-more-menu-btn"
-                className={`text-xs uppercase tracking-[0.2em] font-medium flex items-center gap-1.5 transition-colors py-1.5 cursor-pointer whitespace-nowrap ${
+                className={`text-xs uppercase tracking-[0.18em] font-medium flex items-center gap-1.5 transition-colors py-1.5 cursor-pointer whitespace-nowrap ${
                   moreMenuOpen ? 'text-white' : 'text-zinc-400 hover:text-white'
                 }`}
                 onClick={() => setMoreMenuOpen(!moreMenuOpen)}
@@ -139,7 +148,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath, onNavigate, paginas
               
               {/* Dropdown Menu Box */}
               <div 
-                className={`absolute top-full right-0 pt-2 w-48 transition-all duration-150 origin-top-right z-50 ${
+                className={`absolute top-full right-0 pt-2 w-52 transition-all duration-150 origin-top-right z-50 ${
                   moreMenuOpen 
                     ? 'opacity-100 scale-100 visible pointer-events-auto' 
                     : 'opacity-0 scale-95 invisible pointer-events-none'

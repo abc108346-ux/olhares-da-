@@ -29,7 +29,7 @@ import {
   browserSessionPersistence,
   User 
 } from 'firebase/auth';
-import { Critica, UserProfile, Pagina, HomeSettings, SiteStats, SiteInteressante } from '../types';
+import { Critica, UserProfile, Pagina, HomeSettings, SiteStats, SiteInteressante, PremioOlhares } from '../types';
 import { INITIAL_CRITICAS } from '../data/initialCriticas';
 
 import firebaseConfigJson from '../../firebase-applet-config.json';
@@ -40,6 +40,7 @@ const PAGINAS_STORAGE_KEY = 'olhares_da_cena_paginas';
 const ADMIN_SESSION_KEY = 'olhares_da_cena_admin_session';
 const SITE_STATS_STORAGE_KEY = 'olhares_da_cena_site_stats';
 const SITES_INTERESSANTES_STORAGE_KEY = 'olhares_da_cena_sites_interessantes';
+const PREMIOS_OLHARES_STORAGE_KEY = 'olhares_da_cena_premios_olhares';
 
 const viteEnv = (import.meta as any).env || {};
 
@@ -959,5 +960,210 @@ export const deleteSiteInteressanteFromDb = async (id: string): Promise<boolean>
     console.warn('Could not delete site_interessante from Firestore, removed from local:', err);
     return true;
   }
+};
+
+// ==========================================
+// PRÊMIO OLHARES DA CENA (15 ESPAÇOS)
+// ==========================================
+
+export const createDefault15Premios = (): PremioOlhares[] => {
+  return Array.from({ length: 15 }, (_, i) => {
+    const num = i + 1;
+    const numStr = num < 10 ? `0${num}` : `${num}`;
+    return {
+      id: `premio-${num}`,
+      ordem: num,
+      titulo: `Prêmio ${numStr}`,
+      subtitulo: '',
+      link: '',
+      imagem: '',
+      descricao: '',
+      ativo: true,
+      atualizadoEm: new Date().toISOString(),
+    };
+  });
+};
+
+export const getLocalPremiosOlhares = (): PremioOlhares[] => {
+  try {
+    const cached = localStorage.getItem(PREMIOS_OLHARES_STORAGE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Ensure all 15 slots exist
+        const defaults = createDefault15Premios();
+        const merged = defaults.map((defSlot) => {
+          const found = parsed.find((p: any) => p.ordem === defSlot.ordem || p.id === defSlot.id);
+          return found ? { ...defSlot, ...found } : defSlot;
+        });
+        return merged.sort((a, b) => a.ordem - b.ordem);
+      }
+    }
+  } catch (e) {
+    console.warn('Could not read premios_olhares from localStorage:', e);
+  }
+  return createDefault15Premios();
+};
+
+export const setLocalPremiosOlhares = (items: PremioOlhares[]) => {
+  try {
+    localStorage.setItem(PREMIOS_OLHARES_STORAGE_KEY, JSON.stringify(items));
+  } catch (e) {
+    console.warn('Could not save premios_olhares to localStorage:', e);
+  }
+};
+
+export const fetchPremiosOlhares = async (): Promise<PremioOlhares[]> => {
+  try {
+    const premiosRef = collection(db, 'premios_olhares');
+    const snapshot = await getDocs(premiosRef);
+
+    if (!snapshot.empty) {
+      const list: PremioOlhares[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+      });
+
+      // Merge with 15 slots in case some are missing
+      const defaults = createDefault15Premios();
+      const merged = defaults.map((defSlot) => {
+        const found = list.find(p => p.ordem === defSlot.ordem || p.id === defSlot.id);
+        return found ? { ...defSlot, ...found } : defSlot;
+      });
+      merged.sort((a, b) => a.ordem - b.ordem);
+
+      setLocalPremiosOlhares(merged);
+      return merged;
+    } else {
+      // Initialize 15 empty award slots in Firestore
+      const initial = createDefault15Premios();
+      for (const item of initial) {
+        try {
+          await setDoc(doc(db, 'premios_olhares', item.id), item);
+        } catch {
+          // ignore transient seed errors
+        }
+      }
+      setLocalPremiosOlhares(initial);
+      return initial;
+    }
+  } catch (err) {
+    console.warn('Firestore fetch premios_olhares error, fallback to local storage:', err);
+  }
+
+  return getLocalPremiosOlhares();
+};
+
+export const subscribeToPremiosOlhares = (
+  callback: (premios: PremioOlhares[]) => void
+): (() => void) => {
+  try {
+    const premiosRef = collection(db, 'premios_olhares');
+    const unsubscribe = onSnapshot(
+      premiosRef,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const list: PremioOlhares[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+          });
+          const defaults = createDefault15Premios();
+          const merged = defaults.map((defSlot) => {
+            const found = list.find(p => p.ordem === defSlot.ordem || p.id === defSlot.id);
+            return found ? { ...defSlot, ...found } : defSlot;
+          });
+          merged.sort((a, b) => a.ordem - b.ordem);
+          setLocalPremiosOlhares(merged);
+          callback(merged);
+        } else {
+          callback(getLocalPremiosOlhares());
+        }
+      },
+      (error) => {
+        console.warn('Firestore onSnapshot error on premios_olhares:', error);
+        callback(getLocalPremiosOlhares());
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Could not establish subscription for premios_olhares:', err);
+    callback(getLocalPremiosOlhares());
+    return () => {};
+  }
+};
+
+export const savePremioOlharesToDb = async (premio: PremioOlhares): Promise<PremioOlhares> => {
+  const finalPremio: PremioOlhares = {
+    id: premio.id || `premio-${premio.ordem}`,
+    ordem: Number(premio.ordem),
+    titulo: (premio.titulo || '').trim(),
+    subtitulo: (premio.subtitulo || '').trim(),
+    link: (premio.link || '').trim(),
+    imagem: (premio.imagem || '').trim(),
+    descricao: (premio.descricao || '').trim(),
+    ativo: premio.ativo !== false,
+    atualizadoEm: new Date().toISOString(),
+  };
+
+  // Update local cache
+  const local = getLocalPremiosOlhares();
+  const index = local.findIndex(p => p.id === finalPremio.id || p.ordem === finalPremio.ordem);
+  if (index >= 0) {
+    local[index] = finalPremio;
+  } else {
+    local.push(finalPremio);
+  }
+  local.sort((a, b) => a.ordem - b.ordem);
+  setLocalPremiosOlhares(local);
+
+  // Persist to Firestore
+  try {
+    const docRef = doc(db, 'premios_olhares', finalPremio.id);
+    const firestorePayload: Record<string, any> = {
+      id: finalPremio.id,
+      ordem: finalPremio.ordem,
+      titulo: finalPremio.titulo,
+      subtitulo: finalPremio.subtitulo || '',
+      link: finalPremio.link || '',
+      imagem: finalPremio.imagem || '',
+      descricao: finalPremio.descricao || '',
+      ativo: finalPremio.ativo,
+      atualizadoEm: finalPremio.atualizadoEm,
+    };
+    await setDoc(docRef, firestorePayload, { merge: true });
+    console.log(`Prêmio ${finalPremio.id} salvo com sucesso no Firestore.`);
+  } catch (err) {
+    console.warn('Could not save premio to Firestore, kept local copy:', err);
+  }
+
+  return finalPremio;
+};
+
+export const saveAllPremiosOlharesToDb = async (premios: PremioOlhares[]): Promise<PremioOlhares[]> => {
+  const sanitized = premios.map((p, idx) => ({
+    id: p.id || `premio-${p.ordem || idx + 1}`,
+    ordem: p.ordem || idx + 1,
+    titulo: (p.titulo || '').trim() || `Prêmio ${idx + 1 < 10 ? '0' : ''}${idx + 1}`,
+    subtitulo: (p.subtitulo || '').trim(),
+    link: (p.link || '').trim(),
+    imagem: (p.imagem || '').trim(),
+    descricao: (p.descricao || '').trim(),
+    ativo: p.ativo !== false,
+    atualizadoEm: new Date().toISOString(),
+  }));
+
+  setLocalPremiosOlhares(sanitized);
+
+  // Persist each in Firestore
+  for (const item of sanitized) {
+    try {
+      const docRef = doc(db, 'premios_olhares', item.id);
+      await setDoc(docRef, item, { merge: true });
+    } catch (err) {
+      console.warn(`Could not save premio ${item.id} to Firestore:`, err);
+    }
+  }
+
+  return sanitized;
 };
 

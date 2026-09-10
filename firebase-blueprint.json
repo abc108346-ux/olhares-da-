@@ -71,6 +71,22 @@
         "atualizadoEm": { "type": "string" }
       },
       "required": ["titulo", "url", "ativo"]
+    },
+    "premioOlhares": {
+      "title": "Prêmio Olhares da Cena",
+      "description": "Itens e links premiados do Prêmio Olhares da Cena",
+      "type": "object",
+      "properties": {
+        "ordem": { "type": "number" },
+        "titulo": { "type": "string" },
+        "subtitulo": { "type": "string" },
+        "link": { "type": "string" },
+        "imagem": { "type": "string" },
+        "descricao": { "type": "string" },
+        "ativo": { "type": "boolean" },
+        "atualizadoEm": { "type": "string" }
+      },
+      "required": ["ordem", "titulo", "link", "ativo"]
     }
   },
   "firestore": {
@@ -89,6 +105,10 @@
     "/sites_interessantes/{siteId}": {
       "schema": { "$ref": "#/entities/siteInteressante" },
       "description": "Coleção de links e sites interessantes"
+    },
+    "/premios_olhares/{premioId}": {
+      "schema": { "$ref": "#/entities/premioOlhares" },
+      "description": "Coleção dos 15 espaços e links do Prêmio Olhares da Cena"
     }
   }
 }

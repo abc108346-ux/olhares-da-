@@ -42,6 +42,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Prêmio Olhares da Cena collection
+    match /premios_olhares/{premioId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Fallback default
     match /{document=**} {
       allow read, write: if true;

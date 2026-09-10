@@ -88,11 +88,11 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, paginas = [] }) => {
               ))}
               <li>
                 <button 
-                  id="footer-link-sitemap"
-                  onClick={() => { onNavigate('/sitemap.xml'); scrollToTop(); }} 
-                  className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer text-[11px]"
+                  id="footer-link-premio"
+                  onClick={() => { onNavigate('/premio-olhares-da-cena'); scrollToTop(); }} 
+                  className="text-zinc-400 hover:text-white transition-colors cursor-pointer text-xs"
                 >
-                  Sitemap (XML)
+                  Prêmio Olhares da Cena
                 </button>
               </li>
             </ul>

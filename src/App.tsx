@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Critica, UserProfile, Pagina, SiteInteressante } from './types';
+import { Critica, UserProfile, Pagina, SiteInteressante, PremioOlhares } from './types';
 import { 
   fetchAllCriticas, 
   fetchAllPaginas,
@@ -12,9 +12,11 @@ import {
   subscribeToCriticas,
   subscribeToPaginas,
   subscribeToSitesInteressantes,
+  subscribeToPremiosOlhares,
   getLocalCriticas,
   getLocalPaginas,
-  getLocalSitesInteressantes
+  getLocalSitesInteressantes,
+  getLocalPremiosOlhares
 } from './services/firebase';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -25,7 +27,7 @@ import { PaginaDetailPage } from './pages/PaginaDetailPage';
 import { PesquisaPage } from './pages/PesquisaPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
-import { SitemapPage } from './pages/SitemapPage';
+import { PremioOlharesPage } from './pages/PremioOlharesPage';
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState<string>(() => {
@@ -34,6 +36,7 @@ export default function App() {
   const [criticas, setCriticas] = useState<Critica[]>(() => getLocalCriticas());
   const [paginas, setPaginas] = useState<Pagina[]>(() => getLocalPaginas());
   const [sitesInteressantes, setSitesInteressantes] = useState<SiteInteressante[]>(() => getLocalSitesInteressantes());
+  const [premiosOlhares, setPremiosOlhares] = useState<PremioOlhares[]>(() => getLocalPremiosOlhares());
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -97,12 +100,20 @@ export default function App() {
       }
     });
 
+    // 5. Real-time subscription to Prêmio Olhares da Cena
+    const unsubPremios = subscribeToPremiosOlhares((premiosData) => {
+      if (isMounted && premiosData) {
+        setPremiosOlhares(premiosData);
+      }
+    });
+
     return () => {
       isMounted = false;
       if (unsubAuth) unsubAuth();
       if (unsubCriticas) unsubCriticas();
       if (unsubPaginas) unsubPaginas();
       if (unsubSites) unsubSites();
+      if (unsubPremios) unsubPremios();
     };
   }, []);
 
@@ -137,9 +148,11 @@ export default function App() {
           criticas={criticas}
           paginas={paginas}
           sitesInteressantes={sitesInteressantes}
+          premiosOlhares={premiosOlhares}
           onCriticasChange={(updated) => setCriticas(updated)}
           onPaginasChange={(updated) => setPaginas(updated)}
           onSitesChange={(updated) => setSitesInteressantes(updated)}
+          onPremiosChange={(updated) => setPremiosOlhares(updated)}
           onNavigate={navigateTo}
           onSelectCritica={(slug) => navigateTo(`/criticas/${slug}`)}
         />
@@ -211,13 +224,13 @@ export default function App() {
       );
     }
 
-    // Sitemap XML Page
-    if (cleanPath === '/sitemap.xml' || cleanPath === '/sitemap') {
+    // Prêmio Olhares da Cena (15 Prêmios)
+    if (cleanPath === '/premio-olhares-da-cena' || cleanPath === '/premio' || cleanPath === '/premios') {
       return (
-        <SitemapPage
-          criticas={criticas}
-          paginas={paginas}
+        <PremioOlharesPage
+          premios={premiosOlhares}
           onNavigate={navigateTo}
+          isAdmin={Boolean(currentUser)}
         />
       );
     }

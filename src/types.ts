@@ -106,3 +106,15 @@ export interface SiteInteressante {
   atualizadoEm?: string;
 }
 
+export interface PremioOlhares {
+  id: string;
+  ordem: number;
+  titulo: string;
+  subtitulo?: string;
+  link: string;
+  imagem: string;
+  descricao?: string;
+  ativo: boolean;
+  atualizadoEm?: string;
+}
+
