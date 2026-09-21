@@ -13,7 +13,7 @@ export const Logo: React.FC<LogoProps> = ({
 }) => {
   const [imgError, setImgError] = useState(false);
 
-  // Official logo image asset provided in prompt
+  // High-performance local optimized logo (4.3KB WebP) with official remote fallback
   const officialLogoUrl = "https://i.postimg.cc/MZNhH7P0/Chat-GPT-Image-29-de-ago-de-2026-00-06-46.png";
 
   const sizeClasses = {
@@ -27,15 +27,27 @@ export const Logo: React.FC<LogoProps> = ({
     <div className={`flex flex-col items-start select-none ${className}`}>
       <div className="flex items-center gap-3 bg-black">
         {!imgError ? (
-          <img
-            src={officialLogoUrl}
-            alt="Olhares da Cena - Logo Oficial"
-            referrerPolicy="no-referrer"
-            decoding="async"
-            fetchPriority="high"
-            onError={() => setImgError(true)}
-            className={`${sizeClasses[size]} w-auto object-contain transition-opacity duration-300 contrast-125`}
-          />
+          <picture className="inline-flex items-center">
+            <source srcSet="/logo.webp" type="image/webp" />
+            <img
+              src="/logo.png"
+              alt="Olhares da Cena - Logo Oficial"
+              width={240}
+              height={240}
+              referrerPolicy="no-referrer"
+              decoding="async"
+              fetchPriority="high"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (target.src !== officialLogoUrl) {
+                  target.src = officialLogoUrl;
+                } else {
+                  setImgError(true);
+                }
+              }}
+              className={`${sizeClasses[size]} w-auto object-contain transition-opacity duration-300 contrast-125`}
+            />
+          </picture>
         ) : (
           /* High-fidelity geometric emblem fallback in strict compliance with the white geometric symbol on black background */
           <div className="flex items-center gap-3.5 py-1 px-1">

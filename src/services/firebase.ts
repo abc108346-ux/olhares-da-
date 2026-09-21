@@ -16,31 +16,18 @@ import {
   Timestamp,
   increment
 } from 'firebase/firestore';
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signOut, 
-  onAuthStateChanged as onFirebaseAuthStateChanged,
-  setPersistence,
-  browserLocalPersistence,
-  browserSessionPersistence,
-  User 
-} from 'firebase/auth';
 import { Critica, UserProfile, Pagina, HomeSettings, SiteStats, SiteInteressante, PremioOlhares } from '../types';
 import { INITIAL_CRITICAS } from '../data/initialCriticas';
 
 import firebaseConfigJson from '../../firebase-applet-config.json';
 
 // Local storage backup keys
-const STORAGE_KEY = 'olhares_da_cena_criticas_v2';
-const PAGINAS_STORAGE_KEY = 'olhares_da_cena_paginas';
-const ADMIN_SESSION_KEY = 'olhares_da_cena_admin_session';
-const SITE_STATS_STORAGE_KEY = 'olhares_da_cena_site_stats';
-const SITES_INTERESSANTES_STORAGE_KEY = 'olhares_da_cena_sites_interessantes';
-const PREMIOS_OLHARES_STORAGE_KEY = 'olhares_da_cena_premios_olhares';
+export const STORAGE_KEY = 'olhares_da_cena_criticas_v2';
+export const PAGINAS_STORAGE_KEY = 'olhares_da_cena_paginas';
+export const ADMIN_SESSION_KEY = 'olhares_da_cena_admin_session';
+export const SITE_STATS_STORAGE_KEY = 'olhares_da_cena_site_stats';
+export const SITES_INTERESSANTES_STORAGE_KEY = 'olhares_da_cena_sites_interessantes';
+export const PREMIOS_OLHARES_STORAGE_KEY = 'olhares_da_cena_premios_olhares';
 
 const viteEnv = (import.meta as any).env || {};
 
@@ -63,15 +50,11 @@ try {
 }
 
 // Initialize Firebase App
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize Firestore using canonical getFirestore with designated databaseId
 const databaseId = viteEnv.VITE_FIREBASE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId;
 export const db = getFirestore(app, databaseId && databaseId !== '(default)' ? databaseId : undefined);
-
-// Initialize Auth
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
 
 export enum OperationType {
   CREATE = 'create',
@@ -100,18 +83,19 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  let savedAdmin: any = null;
+  try {
+    const raw = localStorage.getItem(ADMIN_SESSION_KEY);
+    if (raw) savedAdmin = JSON.parse(raw);
+  } catch {
+    // ignore
+  }
+
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth?.currentUser?.uid,
-      email: auth?.currentUser?.email,
-      emailVerified: auth?.currentUser?.emailVerified,
-      isAnonymous: auth?.currentUser?.isAnonymous,
-      tenantId: auth?.currentUser?.tenantId,
-      providerInfo: auth?.currentUser?.providerData?.map(provider => ({
-        providerId: provider.providerId,
-        email: provider.email,
-      })) || []
+      userId: savedAdmin?.uid || null,
+      email: savedAdmin?.email || null,
     },
     operationType,
     path
@@ -731,83 +715,6 @@ export const updateSiteTotalViews = async (newTotal: number): Promise<boolean> =
   } catch (err) {
     console.warn('Could not update site total views in Firestore:', err);
     return false;
-  }
-};
-
-/**
- * Admin Authentication Helpers
- * Uses strictly Firebase Authentication (email/password or Google Sign-In) configured by the user in Firebase Console.
- */
-export const subscribeToAuth = (callback: (user: UserProfile | null) => void) => {
-  return onFirebaseAuthStateChanged(auth, (user: User | null) => {
-    if (user) {
-      const userProfile: UserProfile = {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || 'Editor(a) Olhares da Cena',
-        photoURL: user.photoURL,
-        isAdmin: true,
-      };
-      localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(userProfile));
-      callback(userProfile);
-    } else {
-      localStorage.removeItem(ADMIN_SESSION_KEY);
-      callback(null);
-    }
-  });
-};
-
-export const loginWithEmail = async (email: string, pass: string, rememberMe: boolean = false): Promise<UserProfile> => {
-  await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
-  const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
-  const userProfile: UserProfile = {
-    uid: cred.user.uid,
-    email: cred.user.email,
-    displayName: cred.user.displayName || 'Editor(a) Olhares da Cena',
-    photoURL: cred.user.photoURL,
-    isAdmin: true,
-  };
-  localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(userProfile));
-  return userProfile;
-};
-
-export const registerAdminWithEmail = async (email: string, pass: string): Promise<UserProfile> => {
-  const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
-  const userProfile: UserProfile = {
-    uid: cred.user.uid,
-    email: cred.user.email,
-    displayName: cred.user.displayName || 'Editor(a) Olhares da Cena',
-    photoURL: cred.user.photoURL,
-    isAdmin: true,
-  };
-  localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(userProfile));
-  return userProfile;
-};
-
-export const loginWithGoogleAccount = async (): Promise<UserProfile> => {
-  try {
-    const cred = await signInWithPopup(auth, googleProvider);
-    const userProfile: UserProfile = {
-      uid: cred.user.uid,
-      email: cred.user.email,
-      displayName: cred.user.displayName || 'Editor(a) Olhares da Cena',
-      photoURL: cred.user.photoURL,
-      isAdmin: true,
-    };
-    localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(userProfile));
-    return userProfile;
-  } catch (err: any) {
-    console.error('Google Sign-in error:', err);
-    throw err;
-  }
-};
-
-export const logoutAdminUser = async () => {
-  localStorage.removeItem(ADMIN_SESSION_KEY);
-  try {
-    await signOut(auth);
-  } catch {
-    // ignore
   }
 };
 

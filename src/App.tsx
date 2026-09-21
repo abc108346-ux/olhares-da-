@@ -8,7 +8,6 @@ import { Critica, UserProfile, Pagina, SiteInteressante, PremioOlhares } from '.
 import { 
   fetchAllCriticas, 
   fetchAllPaginas,
-  subscribeToAuth, 
   subscribeToCriticas,
   subscribeToPaginas,
   subscribeToSitesInteressantes,
@@ -39,7 +38,14 @@ export default function App() {
   const [paginas, setPaginas] = useState<Pagina[]>(() => getLocalPaginas());
   const [sitesInteressantes, setSitesInteressantes] = useState<SiteInteressante[]>(() => getLocalSitesInteressantes());
   const [premiosOlhares, setPremiosOlhares] = useState<PremioOlhares[]>(() => getLocalPremiosOlhares());
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    try {
+      const saved = localStorage.getItem('olhares_da_cena_admin_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
 
   // Parse path and query
@@ -72,15 +78,28 @@ export default function App() {
   // Initial Data Load and Auth state
   useEffect(() => {
     let isMounted = true;
+    let unsubAuth: (() => void) | undefined;
+    let unsubPaginas: (() => void) | undefined;
+    let unsubSites: (() => void) | undefined;
+    let unsubPremios: (() => void) | undefined;
 
-    // 1. Subscribe to Firebase auth
-    const unsubAuth = subscribeToAuth((user) => {
-      if (isMounted) {
-        setCurrentUser(user);
-      }
-    });
+    // 1. Subscribe to Firebase auth ONLY if an admin session is active or on admin routes
+    const hasAdminSession = Boolean(localStorage.getItem('olhares_da_cena_admin_session'));
+    const isAdminRoute = window.location.pathname?.startsWith('/admin') || window.location.pathname === '/login';
 
-    // 2. Real-time subscription to Critiques across all devices
+    if (hasAdminSession || isAdminRoute) {
+      import('./services/auth').then(({ subscribeToAuth }) => {
+        if (isMounted) {
+          unsubAuth = subscribeToAuth((user) => {
+            if (isMounted) {
+              setCurrentUser(user);
+            }
+          });
+        }
+      });
+    }
+
+    // 2. Real-time subscription to Critiques across all devices (primary content)
     const unsubCriticas = subscribeToCriticas((items) => {
       if (isMounted && items) {
         setCriticas(items);
@@ -88,26 +107,27 @@ export default function App() {
       }
     });
 
-    // 3. Real-time subscription to Pages
-    const unsubPaginas = subscribeToPaginas((paginasData) => {
-      if (isMounted && paginasData) {
-        setPaginas(paginasData);
-      }
-    });
+    // 3. Defer secondary subscriptions until after critical initial mobile paint
+    const attachSecondarySubscriptions = () => {
+      if (!isMounted) return;
+      unsubPaginas = subscribeToPaginas((paginasData) => {
+        if (isMounted && paginasData) setPaginas(paginasData);
+      });
+      unsubSites = subscribeToSitesInteressantes((sitesData) => {
+        if (isMounted && sitesData) setSitesInteressantes(sitesData);
+      });
+      unsubPremios = subscribeToPremiosOlhares((premiosData) => {
+        if (isMounted && premiosData) setPremiosOlhares(premiosData);
+      });
+    };
 
-    // 4. Real-time subscription to Sites Interessantes
-    const unsubSites = subscribeToSitesInteressantes((sitesData) => {
-      if (isMounted && sitesData) {
-        setSitesInteressantes(sitesData);
+    if (typeof window !== 'undefined') {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(attachSecondarySubscriptions, { timeout: 2500 });
+      } else {
+        setTimeout(attachSecondarySubscriptions, 1500);
       }
-    });
-
-    // 5. Real-time subscription to Prêmio Olhares da Cena
-    const unsubPremios = subscribeToPremiosOlhares((premiosData) => {
-      if (isMounted && premiosData) {
-        setPremiosOlhares(premiosData);
-      }
-    });
+    }
 
     return () => {
       isMounted = false;

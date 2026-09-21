@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, Calendar, MapPin, Tag } from 'lucide-react';
 import { Critica } from '../types';
+import { optimizeImageUrl } from '../utils/imageOptimizer';
 
 interface CriticaCardProps {
   critica: Critica;
@@ -45,7 +46,7 @@ export const CriticaCard: React.FC<CriticaCardProps> = ({ critica, onSelect, fea
         {/* Large Media */}
         <div className="lg:col-span-7 relative h-72 sm:h-96 lg:h-full min-h-[340px] overflow-hidden bg-black">
           <img
-            src={critica.imagemPrincipal}
+            src={optimizeImageUrl(critica.imagemPrincipal, 800)}
             alt={critica.titulo}
             loading="lazy"
             decoding="async"
@@ -109,7 +110,7 @@ export const CriticaCard: React.FC<CriticaCardProps> = ({ critica, onSelect, fea
       {/* Thumbnail */}
       <div className="relative h-56 sm:h-64 overflow-hidden bg-black border-b border-zinc-900">
         <img
-          src={critica.imagemPrincipal}
+          src={optimizeImageUrl(critica.imagemPrincipal, 500)}
           alt={critica.titulo}
           loading="lazy"
           decoding="async"

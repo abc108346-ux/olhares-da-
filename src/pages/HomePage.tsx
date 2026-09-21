@@ -70,14 +70,43 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
       <section id="hero-section" className="w-full border-b border-zinc-900 bg-black pt-2 pb-6 sm:py-8">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative border border-zinc-850 bg-black overflow-hidden shadow-2xl flex items-center justify-center">
-            <img
-              src={homeSettings.heroImageUrl}
-              alt="Olhares da Cena"
-              fetchPriority="high"
-              decoding="async"
-              referrerPolicy="no-referrer"
-              className="w-full h-auto max-h-[500px] object-contain block mx-auto"
-            />
+            {homeSettings.heroImageUrl?.includes('blogger.googleusercontent.com') ? (
+              <picture className="w-full block">
+                <source
+                  type="image/webp"
+                  srcSet={`${homeSettings.heroImageUrl.split('=')[0]}=w480-rw 480w, ${homeSettings.heroImageUrl.split('=')[0]}=s910-rw 910w`}
+                  sizes="(max-width: 640px) 100vw, 910px"
+                />
+                <source
+                  type="image/jpeg"
+                  srcSet={`${homeSettings.heroImageUrl.split('=')[0]}=w480 480w, ${homeSettings.heroImageUrl.split('=')[0]}=s910 910w`}
+                  sizes="(max-width: 640px) 100vw, 910px"
+                />
+                <img
+                  src={homeSettings.heroImageUrl}
+                  alt="Olhares da Cena"
+                  width={910}
+                  height={512}
+                  fetchPriority="high"
+                  decoding="async"
+                  referrerPolicy="no-referrer"
+                  className="w-full h-auto max-h-[500px] object-contain block mx-auto"
+                  style={{ aspectRatio: '910 / 512' }}
+                />
+              </picture>
+            ) : (
+              <img
+                src={homeSettings.heroImageUrl}
+                alt="Olhares da Cena"
+                width={910}
+                height={512}
+                fetchPriority="high"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                className="w-full h-auto max-h-[500px] object-contain block mx-auto"
+                style={{ aspectRatio: '910 / 512' }}
+              />
+            )}
           </div>
         </div>
       </section>

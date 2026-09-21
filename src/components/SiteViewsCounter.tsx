@@ -19,39 +19,52 @@ export const SiteViewsCounter: React.FC<SiteViewsCounterProps> = ({
 
   useEffect(() => {
     let isMounted = true;
+    let unsubscribe: (() => void) | undefined;
+    let timer: any;
 
-    // 1. Instant automatic fetch right on mount (same as clicking manual refresh, but instant)
-    getSiteStats().then((latest) => {
-      if (isMounted && latest) {
-        setStats(latest);
-      }
-    }).catch(() => {});
+    const initStats = () => {
+      if (!isMounted) return;
 
-    // 2. Register visit ONLY if this device has never been counted before (persisted in localStorage)
-    registerDeviceVisitOnce().then((realCount) => {
-      if (isMounted && typeof realCount === 'number') {
-        setStats(prev => ({ ...prev, totalViews: realCount }));
-      }
-    }).catch(() => {});
+      // 1. Instant automatic fetch (same as clicking manual refresh)
+      getSiteStats().then((latest) => {
+        if (isMounted && latest) {
+          setStats(latest);
+        }
+      }).catch(() => {});
 
-    // 3. Real-time subscription to Firestore for new devices entering
-    const unsubscribe = subscribeToSiteStats((updatedStats) => {
-      if (isMounted && updatedStats) {
-        setStats((prev) => {
-          if (prev.totalViews !== updatedStats.totalViews) {
-            setIsLivePulsing(true);
-            setTimeout(() => {
-              if (isMounted) setIsLivePulsing(false);
-            }, 2000);
-          }
-          return updatedStats;
-        });
-      }
-    });
+      // 2. Register visit ONLY if this device has never been counted before (persisted in localStorage)
+      registerDeviceVisitOnce().then((realCount) => {
+        if (isMounted && typeof realCount === 'number') {
+          setStats(prev => ({ ...prev, totalViews: realCount }));
+        }
+      }).catch(() => {});
+
+      // 3. Real-time subscription to Firestore for new devices entering
+      unsubscribe = subscribeToSiteStats((updatedStats) => {
+        if (isMounted && updatedStats) {
+          setStats((prev) => {
+            if (prev.totalViews !== updatedStats.totalViews) {
+              setIsLivePulsing(true);
+              setTimeout(() => {
+                if (isMounted) setIsLivePulsing(false);
+              }, 2000);
+            }
+            return updatedStats;
+          });
+        }
+      });
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(initStats, { timeout: 2000 });
+    } else {
+      timer = setTimeout(initStats, 1000);
+    }
 
     return () => {
       isMounted = false;
-      unsubscribe();
+      if (timer) clearTimeout(timer);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

@@ -21,7 +21,6 @@ import {
   deletePremioOlharesFromDb,
   getLocalPremiosOlhares,
   seedDatabaseIfEmpty, 
-  logoutAdminUser,
   getHomeSettings,
   saveHomeSettings,
   subscribeToSiteStats,
@@ -29,6 +28,7 @@ import {
   getLocalSiteStats,
   updateSiteTotalViews
 } from '../services/firebase';
+import { logoutAdminUser } from '../services/auth';
 import { Logo } from '../components/Logo';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { ImageUploadManager } from '../components/ImageUploadManager';

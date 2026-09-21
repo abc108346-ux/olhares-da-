@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { loginWithEmail } from '../services/firebase';
+import { loginWithEmail } from '../services/auth';
 import { UserProfile } from '../types';
 import { Logo } from '../components/Logo';
 import { Shield, Lock, Mail, ArrowLeft, AlertCircle, Check } from 'lucide-react';
