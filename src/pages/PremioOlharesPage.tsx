@@ -116,7 +116,6 @@ export const PremioOlharesPage: React.FC<PremioOlharesPageProps> = ({
             })();
 
             const hasLink = validLinks.length > 0;
-            const formattedNum = premio.ordem < 10 ? `0${premio.ordem}` : `${premio.ordem}`;
 
             return (
               <article
@@ -141,17 +140,10 @@ export const PremioOlharesPage: React.FC<PremioOlharesPageProps> = ({
                     <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-br from-zinc-900 via-zinc-950 to-black text-zinc-600">
                       <Trophy className="w-10 h-10 stroke-[1.2] mb-2 text-zinc-700 group-hover:text-amber-400/60 transition-colors" />
                       <span className="text-[11px] font-mono uppercase tracking-widest text-zinc-500">
-                        Prêmio {formattedNum}
+                        {premio.titulo || 'Prêmio Olhares da Cena'}
                       </span>
                     </div>
                   )}
-
-                  {/* Badge Number */}
-                  <div className="absolute top-3 left-3 bg-black/85 backdrop-blur-md px-2.5 py-1 border border-zinc-700/60 flex items-center gap-1.5 shadow-md">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400 font-bold">
-                      #{formattedNum}
-                    </span>
-                  </div>
 
                   {/* Status if inactive */}
                   {!premio.ativo && (
@@ -211,7 +203,7 @@ export const PremioOlharesPage: React.FC<PremioOlharesPageProps> = ({
                               className="inline-flex items-center justify-between w-full px-3 py-2 bg-zinc-900 hover:bg-amber-400 hover:text-black text-zinc-200 text-xs font-mono uppercase tracking-wider font-semibold border border-zinc-850 hover:border-amber-300 transition-all duration-150 cursor-pointer group/link"
                             >
                               <span className="truncate pr-2">
-                                {item.titulo || `Link #${lIdx + 1}`}
+                                {item.titulo || (lIdx === 0 ? 'Acessar Prêmio' : `Link ${lIdx + 1}`)}
                               </span>
                               {item.url.startsWith('http') ? (
                                 <ExternalLink className="w-3.5 h-3.5 shrink-0 text-zinc-400 group-hover/link:text-black" />
@@ -225,7 +217,7 @@ export const PremioOlharesPage: React.FC<PremioOlharesPageProps> = ({
                     ) : (
                       <div className="flex items-center justify-between py-2 text-zinc-600 text-xs font-mono uppercase">
                         <span>Link em preparação</span>
-                        <span className="text-[10px] text-zinc-700">#Espaço {formattedNum}</span>
+                        <span className="text-[10px] text-zinc-600">Em breve</span>
                       </div>
                     )}
                   </div>

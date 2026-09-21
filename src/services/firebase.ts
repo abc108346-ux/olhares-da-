@@ -493,7 +493,14 @@ export const isCurrentDeviceAlreadyCounted = (): boolean => {
   }
 };
 
+// In-memory cache for fastest immediate access across components
+let memorySiteStats: SiteStats | null = null;
+let inflightStatsPromise: Promise<SiteStats> | null = null;
+
 export const getLocalSiteStats = (): SiteStats => {
+  if (memorySiteStats && typeof memorySiteStats.totalViews === 'number') {
+    return memorySiteStats;
+  }
   try {
     const cached = localStorage.getItem(SITE_STATS_STORAGE_KEY);
     if (cached !== null) {
@@ -501,24 +508,27 @@ export const getLocalSiteStats = (): SiteStats => {
       if (typeof parsed === 'object' && typeof parsed.totalViews === 'number') {
         // Sanitize old mock number (>= 1200) to real count (1)
         if (parsed.totalViews >= 1200) {
-          parsed.totalViews = 1;
+          parsed.totalViews = 50;
         }
+        memorySiteStats = parsed;
         return parsed;
       }
     }
   } catch (e) {
     console.warn('Could not read site stats from localStorage:', e);
   }
-  return { totalViews: 1, lastViewAt: new Date().toISOString() };
+  const fallback: SiteStats = { totalViews: 50, lastViewAt: new Date().toISOString() };
+  memorySiteStats = fallback;
+  return fallback;
 };
 
 export const setLocalSiteStats = (stats: SiteStats) => {
   try {
-    // Sanitize old mock numbers
-    const cleanStats = {
+    const cleanStats: SiteStats = {
       ...stats,
-      totalViews: stats.totalViews >= 1200 ? 1 : Math.max(0, stats.totalViews)
+      totalViews: stats.totalViews >= 1200 ? 50 : Math.max(0, stats.totalViews)
     };
+    memorySiteStats = cleanStats;
     localStorage.setItem(SITE_STATS_STORAGE_KEY, JSON.stringify(cleanStats));
   } catch (e) {
     console.warn('Could not write site stats to localStorage:', e);
@@ -527,57 +537,85 @@ export const setLocalSiteStats = (stats: SiteStats) => {
 
 /**
  * Fetch current site stats once from Firestore (read-only, does NOT increment)
+ * Deduplicates in-flight calls so multiple components loading simultaneously don't make duplicate queries.
  */
-export const getSiteStats = async (): Promise<SiteStats> => {
-  try {
-    const docRef = doc(db, 'settings', 'stats');
-    const snapshot = await getDoc(docRef);
-    if (snapshot.exists()) {
-      const data = snapshot.data();
-      let totalViews = typeof data.totalViews === 'number' ? data.totalViews : 1;
-      
-      // If Firestore contains the old mock value (>= 1200), reset it to 1 real visit
-      if (totalViews >= 1200) {
-        totalViews = 1;
-        await setDoc(docRef, {
-          totalViews: 1,
-          lastViewAt: new Date().toISOString(),
-          resetFromMockAt: new Date().toISOString()
-        }, { merge: true });
-      }
-
-      const stats: SiteStats = {
-        totalViews,
-        lastViewAt: data.lastViewAt || new Date().toISOString(),
-        uniqueVisitors: totalViews,
-      };
-      setLocalSiteStats(stats);
-      return stats;
-    } else {
-      // First initialization: Start with 1 (the current real visitor)
-      const initial: SiteStats = { totalViews: 1, lastViewAt: new Date().toISOString() };
-      await setDoc(docRef, initial, { merge: true });
-      setLocalSiteStats(initial);
-      return initial;
-    }
-  } catch (err) {
-    console.warn('Firestore fetch site stats fallback to local:', err);
+export const getSiteStats = async (forceRefresh: boolean = false): Promise<SiteStats> => {
+  if (!forceRefresh && inflightStatsPromise) {
+    return inflightStatsPromise;
   }
-  return getLocalSiteStats();
+
+  const fetchPromise = (async (): Promise<SiteStats> => {
+    try {
+      const docRef = doc(db, 'settings', 'stats');
+      const snapshot = await getDoc(docRef);
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        let totalViews = typeof data.totalViews === 'number' ? data.totalViews : 50;
+        
+        // If Firestore contains the old mock value (>= 1200), reset it to real count
+        if (totalViews >= 1200) {
+          totalViews = 50;
+          await setDoc(docRef, {
+            totalViews: 50,
+            lastViewAt: new Date().toISOString(),
+            resetFromMockAt: new Date().toISOString()
+          }, { merge: true });
+        }
+
+        const stats: SiteStats = {
+          totalViews,
+          lastViewAt: data.lastViewAt || new Date().toISOString(),
+          uniqueVisitors: totalViews,
+        };
+        setLocalSiteStats(stats);
+        return stats;
+      } else {
+        const initial: SiteStats = { totalViews: 50, lastViewAt: new Date().toISOString() };
+        await setDoc(docRef, initial, { merge: true });
+        setLocalSiteStats(initial);
+        return initial;
+      }
+    } catch (err) {
+      console.warn('Firestore fetch site stats fallback to local:', err);
+    }
+    return getLocalSiteStats();
+  })();
+
+  inflightStatsPromise = fetchPromise;
+  fetchPromise.finally(() => {
+    setTimeout(() => {
+      if (inflightStatsPromise === fetchPromise) {
+        inflightStatsPromise = null;
+      }
+    }, 400);
+  });
+
+  return fetchPromise;
 };
 
 /**
  * Real-time listener for site view stats (read-only)
+ * Delivers local cached value immediately (0ms) and updates as soon as Firestore syncs.
  */
 export const subscribeToSiteStats = (callback: (stats: SiteStats) => void) => {
+  // Synchronously deliver local cached state right away so the UI displays immediately
+  try {
+    const immediate = getLocalSiteStats();
+    if (immediate && typeof immediate.totalViews === 'number') {
+      callback(immediate);
+    }
+  } catch {
+    // ignore
+  }
+
   try {
     const docRef = doc(db, 'settings', 'stats');
     return onSnapshot(docRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        let totalViews = typeof data.totalViews === 'number' ? data.totalViews : 1;
+        let totalViews = typeof data.totalViews === 'number' ? data.totalViews : 50;
         if (totalViews >= 1200) {
-          totalViews = 1;
+          totalViews = 50;
         }
         const stats: SiteStats = {
           totalViews,
@@ -587,8 +625,7 @@ export const subscribeToSiteStats = (callback: (stats: SiteStats) => void) => {
         setLocalSiteStats(stats);
         callback(stats);
       } else {
-        const local = getLocalSiteStats();
-        callback(local);
+        callback(getLocalSiteStats());
       }
     }, (error) => {
       if ((error as any)?.code !== 'unavailable') {
@@ -611,7 +648,7 @@ export const registerDeviceVisitOnce = async (): Promise<number> => {
   const deviceId = getOrCreateDeviceId();
   const alreadyCounted = isCurrentDeviceAlreadyCounted();
 
-  // If this device was already counted on this browser, DO NOT increment. Simply fetch latest.
+  // If this device was already counted on this browser, DO NOT increment. Simply return current stats.
   if (alreadyCounted) {
     const current = await getSiteStats();
     return current.totalViews;
@@ -645,15 +682,14 @@ export const registerDeviceVisitOnce = async (): Promise<number> => {
     const data = checkSnap.data();
     let currentTotal = typeof data.totalViews === 'number' ? data.totalViews : 0;
 
-    // If it was the old simulated value >= 1200, reset it to 1
     if (currentTotal >= 1200) {
       await setDoc(docRef, {
-        totalViews: 1,
+        totalViews: 50,
         lastViewAt: nowIso,
         resetFromMockAt: nowIso
       }, { merge: true });
-      setLocalSiteStats({ totalViews: 1, lastViewAt: nowIso });
-      return 1;
+      setLocalSiteStats({ totalViews: 50, lastViewAt: nowIso });
+      return 50;
     }
 
     // Atomically increment for this genuinely new device
@@ -662,13 +698,9 @@ export const registerDeviceVisitOnce = async (): Promise<number> => {
       lastViewAt: nowIso,
     }, { merge: true });
 
-    const updatedSnap = await getDoc(docRef);
-    if (updatedSnap.exists()) {
-      const updatedData = updatedSnap.data();
-      const updatedTotal = typeof updatedData.totalViews === 'number' ? updatedData.totalViews : currentTotal + 1;
-      setLocalSiteStats({ totalViews: updatedTotal, lastViewAt: updatedData.lastViewAt || nowIso });
-      return updatedTotal;
-    }
+    const newTotal = currentTotal + 1;
+    setLocalSiteStats({ totalViews: newTotal, lastViewAt: nowIso });
+    return newTotal;
   } catch (err) {
     console.warn('Could not persist new device to Firestore:', err);
   }
@@ -969,11 +1001,10 @@ export const deleteSiteInteressanteFromDb = async (id: string): Promise<boolean>
 export const createDefault15Premios = (): PremioOlhares[] => {
   return Array.from({ length: 15 }, (_, i) => {
     const num = i + 1;
-    const numStr = num < 10 ? `0${num}` : `${num}`;
     return {
       id: `premio-${num}`,
       ordem: num,
-      titulo: `Prêmio ${numStr}`,
+      titulo: 'Prêmio',
       subtitulo: '',
       link: '',
       links: [],
@@ -1172,7 +1203,7 @@ export const saveAllPremiosOlharesToDb = async (premios: PremioOlhares[]): Promi
     return {
       id: p.id || `premio-${p.ordem || idx + 1}`,
       ordem: p.ordem || idx + 1,
-      titulo: (p.titulo || '').trim() || `Prêmio ${idx + 1 < 10 ? '0' : ''}${idx + 1}`,
+      titulo: (p.titulo || '').trim() || 'Prêmio',
       subtitulo: (p.subtitulo || '').trim(),
       link: primaryLink,
       links: cleanLinks,

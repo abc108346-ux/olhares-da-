@@ -21,13 +21,15 @@ import {
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomePage } from './pages/HomePage';
-import { CriticasPage } from './pages/CriticasPage';
-import { CriticaDetailPage } from './pages/CriticaDetailPage';
-import { PaginaDetailPage } from './pages/PaginaDetailPage';
-import { PesquisaPage } from './pages/PesquisaPage';
-import { AdminLoginPage } from './pages/AdminLoginPage';
-import { AdminDashboardPage } from './pages/AdminDashboardPage';
-import { PremioOlharesPage } from './pages/PremioOlharesPage';
+
+// Code-split secondary and admin pages so the initial mobile bundle only loads the homepage
+const CriticasPage = React.lazy(() => import('./pages/CriticasPage').then(m => ({ default: m.CriticasPage })));
+const CriticaDetailPage = React.lazy(() => import('./pages/CriticaDetailPage').then(m => ({ default: m.CriticaDetailPage })));
+const PaginaDetailPage = React.lazy(() => import('./pages/PaginaDetailPage').then(m => ({ default: m.PaginaDetailPage })));
+const PesquisaPage = React.lazy(() => import('./pages/PesquisaPage').then(m => ({ default: m.PesquisaPage })));
+const AdminLoginPage = React.lazy(() => import('./pages/AdminLoginPage').then(m => ({ default: m.AdminLoginPage })));
+const AdminDashboardPage = React.lazy(() => import('./pages/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
+const PremioOlharesPage = React.lazy(() => import('./pages/PremioOlharesPage').then(m => ({ default: m.PremioOlharesPage })));
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState<string>(() => {
@@ -115,6 +117,23 @@ export default function App() {
       if (unsubSites) unsubSites();
       if (unsubPremios) unsubPremios();
     };
+  }, []);
+
+  // Prefetch non-critical public routes on idle so navigation feels instant without blocking initial mobile paint
+  useEffect(() => {
+    const prefetchRoutes = () => {
+      import('./pages/CriticasPage');
+      import('./pages/PesquisaPage');
+      import('./pages/PremioOlharesPage');
+    };
+
+    if (typeof window !== 'undefined') {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(prefetchRoutes, { timeout: 3500 });
+      } else {
+        setTimeout(prefetchRoutes, 2500);
+      }
+    }
   }, []);
 
   // Determine active view from currentPath
@@ -287,7 +306,9 @@ export default function App() {
 
       {/* Main View Container */}
       <div className="flex-1">
-        {renderContent()}
+        <React.Suspense fallback={<div className="min-h-[60vh] bg-black" />}>
+          {renderContent()}
+        </React.Suspense>
       </div>
 
       {/* Show footer on public pages */}

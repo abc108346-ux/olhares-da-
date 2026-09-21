@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Eye, RefreshCw, Activity, ShieldCheck } from 'lucide-react';
-import { subscribeToSiteStats, registerDeviceVisitOnce, getSiteStats } from '../services/firebase';
+import { subscribeToSiteStats, registerDeviceVisitOnce, getSiteStats, getLocalSiteStats } from '../services/firebase';
 import { SiteStats } from '../types';
 
 interface SiteViewsCounterProps {
@@ -12,28 +12,45 @@ export const SiteViewsCounter: React.FC<SiteViewsCounterProps> = ({
   className = '',
   variant = 'card'
 }) => {
-  const [stats, setStats] = useState<SiteStats>({ totalViews: 1 });
+  // Start immediately with cached or local stats (0ms delay, no waiting for network)
+  const [stats, setStats] = useState<SiteStats>(() => getLocalSiteStats());
   const [isLivePulsing, setIsLivePulsing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    // 1. Register visit ONLY if this device has never been counted before (persisted in localStorage)
-    registerDeviceVisitOnce().then((realCount) => {
-      setStats(prev => ({ ...prev, totalViews: realCount }));
+    let isMounted = true;
+
+    // 1. Instant automatic fetch right on mount (same as clicking manual refresh, but instant)
+    getSiteStats().then((latest) => {
+      if (isMounted && latest) {
+        setStats(latest);
+      }
     }).catch(() => {});
 
-    // 2. Real-time subscription to Firestore for new devices entering
+    // 2. Register visit ONLY if this device has never been counted before (persisted in localStorage)
+    registerDeviceVisitOnce().then((realCount) => {
+      if (isMounted && typeof realCount === 'number') {
+        setStats(prev => ({ ...prev, totalViews: realCount }));
+      }
+    }).catch(() => {});
+
+    // 3. Real-time subscription to Firestore for new devices entering
     const unsubscribe = subscribeToSiteStats((updatedStats) => {
-      setStats((prev) => {
-        if (prev.totalViews !== updatedStats.totalViews) {
-          setIsLivePulsing(true);
-          setTimeout(() => setIsLivePulsing(false), 2000);
-        }
-        return updatedStats;
-      });
+      if (isMounted && updatedStats) {
+        setStats((prev) => {
+          if (prev.totalViews !== updatedStats.totalViews) {
+            setIsLivePulsing(true);
+            setTimeout(() => {
+              if (isMounted) setIsLivePulsing(false);
+            }, 2000);
+          }
+          return updatedStats;
+        });
+      }
     });
 
     return () => {
+      isMounted = false;
       unsubscribe();
     };
   }, []);
@@ -42,10 +59,10 @@ export const SiteViewsCounter: React.FC<SiteViewsCounterProps> = ({
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     try {
-      const latest = await getSiteStats();
+      const latest = await getSiteStats(true);
       setStats(latest);
     } finally {
-      setTimeout(() => setIsRefreshing(false), 400);
+      setTimeout(() => setIsRefreshing(false), 300);
     }
   };
 

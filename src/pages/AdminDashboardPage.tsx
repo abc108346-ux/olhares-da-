@@ -25,6 +25,8 @@ import {
   getHomeSettings,
   saveHomeSettings,
   subscribeToSiteStats,
+  getSiteStats,
+  getLocalSiteStats,
   updateSiteTotalViews
 } from '../services/firebase';
 import { Logo } from '../components/Logo';
@@ -218,15 +220,26 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
     manifestoCaption: 'Olhares da Cena • Arquivo Crítico Teatral'
   });
 
-  const [siteStats, setSiteStats] = useState<SiteStats>({ totalViews: 1 });
-  const [customViewCountInput, setCustomViewCountInput] = useState<string>('1');
+  const [siteStats, setSiteStats] = useState<SiteStats>(() => getLocalSiteStats());
+  const [customViewCountInput, setCustomViewCountInput] = useState<string>(() => String(getLocalSiteStats().totalViews));
 
   useEffect(() => {
+    let isMounted = true;
+    getSiteStats().then((s) => {
+      if (isMounted && s) {
+        setSiteStats(s);
+        setCustomViewCountInput(String(s.totalViews));
+      }
+    }).catch(() => {});
+
     const unsubStats = subscribeToSiteStats((s) => {
-      setSiteStats(s);
-      setCustomViewCountInput(String(s.totalViews));
+      if (isMounted && s) {
+        setSiteStats(s);
+        setCustomViewCountInput(String(s.totalViews));
+      }
     });
     return () => {
+      isMounted = false;
       unsubStats();
     };
   }, []);
@@ -808,11 +821,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
 
   const handleAddPremio = async () => {
     const nextOrdem = premios.length > 0 ? Math.max(...premios.map(p => p.ordem || 0)) + 1 : 1;
-    const numStr = nextOrdem < 10 ? `0${nextOrdem}` : `${nextOrdem}`;
     const newPremio: PremioOlhares = {
       id: `premio-${Date.now()}`,
       ordem: nextOrdem,
-      titulo: `Prêmio ${numStr}`,
+      titulo: 'Novo Prêmio',
       subtitulo: '',
       link: '',
       links: [{ url: '', titulo: '' }],
@@ -828,9 +840,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
 
     try {
       await savePremioOlharesToDb(newPremio);
-      showNotification(`Prêmio #${nextOrdem} adicionado com sucesso!`);
+      showNotification('Novo prêmio adicionado com sucesso!');
     } catch {
-      showNotification(`Prêmio #${nextOrdem} adicionado localmente.`);
+      showNotification('Novo prêmio adicionado localmente.');
     }
 
     setTimeout(() => {
@@ -921,7 +933,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       const nextPremios = premios.filter(p => p.id !== premioToDelete.id);
       setPremios(nextPremios);
       onPremiosChange?.(nextPremios);
-      showNotification(`Prêmio #${premioToDelete.ordem} excluído com sucesso.`);
+      showNotification(`Prêmio "${premioToDelete.titulo || 'selecionado'}" excluído com sucesso.`);
     } catch {
       showNotification('Erro ao excluir prêmio.', 'error');
     } finally {
@@ -950,9 +962,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       nextPremios[index] = saved;
       setPremios(nextPremios);
       onPremiosChange?.(nextPremios);
-      showNotification(`Prêmio #${item.ordem} salvo com sucesso!`);
+      showNotification(`Prêmio "${item.titulo || 'selecionado'}" salvo com sucesso!`);
     } catch {
-      showNotification(`Erro ao salvar Prêmio #${item.ordem}.`, 'error');
+      showNotification(`Erro ao salvar prêmio "${item.titulo || ''}".`, 'error');
     } finally {
       setSavingPremioIndex(null);
     }
@@ -964,7 +976,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       const savedList = await saveAllPremiosOlharesToDb(premios);
       setPremios(savedList);
       onPremiosChange?.(savedList);
-      showNotification('Todos os 15 espaços do Prêmio Olhares da Cena foram salvos com sucesso!');
+      showNotification('Todos os prêmios foram salvos com sucesso!');
     } catch {
       showNotification('Erro ao salvar prêmios.', 'error');
     } finally {
@@ -983,7 +995,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
     reader.onload = () => {
       const base64 = reader.result as string;
       handleUpdatePremioField(index, 'imagem', base64);
-      showNotification(`Imagem anexada ao Prêmio #${index + 1}!`);
+      showNotification('Imagem anexada com sucesso!');
     };
     reader.onerror = () => {
       showNotification('Erro ao processar imagem.', 'error');
@@ -2684,7 +2696,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
             <div className="space-y-6">
               {premios.map((premio, idx) => {
                 const mode = premioImageMode[idx] || 'url';
-                const formattedNum = premio.ordem < 10 ? `0${premio.ordem}` : `${premio.ordem}`;
                 const isSavingThis = savingPremioIndex === idx;
 
                 return (
@@ -2697,10 +2708,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-850 pb-4">
                       <div className="flex items-center gap-3">
                         <span className="px-3 py-1 bg-black border border-amber-500/40 text-amber-300 font-mono text-xs font-bold uppercase tracking-widest">
-                          ESPAÇO #{formattedNum}
+                          PRÊMIO
                         </span>
                         <h3 className="font-serif text-lg font-bold text-white uppercase">
-                          {premio.titulo || `Prêmio ${formattedNum}`}
+                          {premio.titulo || 'Novo Prêmio'}
                         </h3>
                       </div>
 
@@ -2755,7 +2766,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                             type="text"
                             value={premio.titulo}
                             onChange={(e) => handleUpdatePremioField(idx, 'titulo', e.target.value)}
-                            placeholder={`Ex: Prêmio ${formattedNum} - Melhor Espetáculo`}
+                            placeholder="Ex: Melhor Espetáculo, Melhor Direção..."
                             className="w-full bg-black border border-zinc-800 p-2.5 text-white text-sm focus:border-amber-400 focus:outline-none"
                           />
                         </div>
@@ -2800,7 +2811,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                                 <div key={linkIdx} className="p-2.5 bg-black border border-zinc-850 hover:border-zinc-750 transition-colors space-y-2">
                                   <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
                                     <span className="font-semibold text-amber-400 flex items-center gap-1">
-                                      <span>Link #{linkIdx + 1}</span>
+                                      <span>Link {linkIdx + 1}</span>
                                       {linkIdx === 0 && (
                                         <span className="text-[9px] text-zinc-500 font-normal">(Principal)</span>
                                       )}
@@ -2964,7 +2975,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 className="w-full py-5 border border-dashed border-zinc-800 hover:border-amber-400/80 hover:bg-amber-500/5 text-zinc-400 hover:text-amber-300 font-mono text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 cursor-pointer group"
               >
                 <PlusCircle className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-                <span>+ Adicionar Novo Prêmio (Prêmio #{premios.length + 1 < 10 ? `0${premios.length + 1}` : premios.length + 1})</span>
+                <span>+ Adicionar Novo Prêmio</span>
               </button>
             </div>
 
@@ -3377,7 +3388,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       <ModalConfirm
         isOpen={deletePremioModalOpen}
         title="Excluir Prêmio"
-        message={`Tem certeza que deseja remover o Prêmio #${premioToDelete?.ordem} - "${premioToDelete?.titulo}"? Ele deixará de ser exibido na lista de prêmios.`}
+        message={`Tem certeza que deseja remover o prêmio "${premioToDelete?.titulo || 'selecionado'}"? Ele deixará de ser exibido na lista de prêmios.`}
         confirmText="Sim, Excluir Prêmio"
         cancelText="Cancelar"
         onConfirm={handleConfirmDeletePremio}

@@ -48,6 +48,7 @@ export const CriticaCard: React.FC<CriticaCardProps> = ({ critica, onSelect, fea
             src={critica.imagemPrincipal}
             alt={critica.titulo}
             loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover object-center grayscale contrast-125 group-hover:scale-105 group-hover:grayscale-0 transition-all duration-500"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent lg:hidden" />
@@ -111,6 +112,7 @@ export const CriticaCard: React.FC<CriticaCardProps> = ({ critica, onSelect, fea
           src={critica.imagemPrincipal}
           alt={critica.titulo}
           loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover object-center grayscale contrast-125 group-hover:scale-105 group-hover:grayscale-0 transition-all duration-500"
         />
         <div className="absolute top-3 left-3">

@@ -74,6 +74,7 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
               src={homeSettings.heroImageUrl}
               alt="Olhares da Cena"
               fetchPriority="high"
+              decoding="async"
               referrerPolicy="no-referrer"
               className="w-full h-auto max-h-[500px] object-contain block mx-auto"
             />

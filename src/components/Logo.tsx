@@ -31,6 +31,8 @@ export const Logo: React.FC<LogoProps> = ({
             src={officialLogoUrl}
             alt="Olhares da Cena - Logo Oficial"
             referrerPolicy="no-referrer"
+            decoding="async"
+            fetchPriority="high"
             onError={() => setImgError(true)}
             className={`${sizeClasses[size]} w-auto object-contain transition-opacity duration-300 contrast-125`}
           />
