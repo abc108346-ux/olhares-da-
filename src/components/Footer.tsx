@@ -1,5 +1,5 @@
 import React from 'react';
-import { Instagram, ArrowUpRight, ArrowUp } from 'lucide-react';
+import { Instagram, ArrowUpRight, ArrowUp, Mail } from 'lucide-react';
 import { Logo } from './Logo';
 import { SiteViewsCounter } from './SiteViewsCounter';
 import { Pagina } from '../types';
@@ -98,12 +98,13 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, paginas = [] }) => {
             </ul>
           </div>
 
-          {/* Social / Editorial Connection */}
-          <div className="md:col-span-3 space-y-4">
-            <h4 className="text-xs uppercase tracking-[0.25em] text-white font-semibold border-b border-zinc-900 pb-2">
-              REDES & CONTATO
-            </h4>
+          {/* Social / Editorial Connection & Contact */}
+          <div className="md:col-span-3 space-y-6">
+            {/* Social */}
             <div className="space-y-3">
+              <h4 className="text-xs uppercase tracking-[0.25em] text-white font-semibold border-b border-zinc-900 pb-2">
+                REDES SOCIAIS
+              </h4>
               <a
                 id="footer-instagram-btn"
                 href="https://www.instagram.com/olharesdacena/"
@@ -122,6 +123,29 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, paginas = [] }) => {
 
               <p className="text-[11px] text-zinc-400 font-light leading-relaxed">
                 Acompanhe coberturas de festivais, estreias teatrais e debates cênicos em tempo real.
+              </p>
+            </div>
+
+            {/* Contato */}
+            <div className="space-y-3">
+              <h4 className="text-xs uppercase tracking-[0.25em] text-white font-semibold border-b border-zinc-900 pb-2">
+                CONTATO
+              </h4>
+              <a
+                id="footer-email-link"
+                href="mailto:olharesdacena@gmail.com"
+                className="group flex items-center justify-between p-3 border border-zinc-800 hover:border-white transition-all duration-200 bg-zinc-950"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Mail className="w-4 h-4 text-zinc-400 group-hover:text-white transition-colors shrink-0" />
+                  <span className="text-xs font-mono text-zinc-300 group-hover:text-white truncate">
+                    olharesdacena@gmail.com
+                  </span>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-zinc-500 group-hover:text-white transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 shrink-0 ml-2" />
+              </a>
+              <p className="text-[11px] text-zinc-400 font-light leading-relaxed">
+                Sugestões de pautas, convites e contato editorial.
               </p>
             </div>
           </div>

@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { Critica, SiteInteressante } from '../types';
 import { formatDateBr } from '../components/CriticaCard';
-import { FichaTecnica } from '../components/FichaTecnica';
 import { RichContentRenderer } from '../components/RichContentRenderer';
 import { ShareButtons } from '../components/ShareButtons';
 import { CriticaCard } from '../components/CriticaCard';
@@ -142,15 +141,6 @@ export const CriticaDetailPage: React.FC<CriticaDetailPageProps> = ({
           <section className="w-full lg:flex-1 min-w-0 overflow-x-hidden">
             {/* Full Rich Markdown / HTML content */}
             <RichContentRenderer content={critica.conteudo} />
-
-            {/* Ficha Técnica */}
-            <FichaTecnica
-              ficha={critica.fichaTecnica}
-              nomeEspetaculo={critica.nomeEspetaculo}
-              companhia={critica.companhia}
-              cidade={critica.cidade}
-              estado={critica.estado}
-            />
 
             {/* Additional Images Gallery if any */}
             {critica.imagens && critica.imagens.length > 0 && (

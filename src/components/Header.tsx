@@ -70,10 +70,82 @@ export const Header: React.FC<HeaderProps> = ({ currentPath, onNavigate, paginas
     ...headerPages.map(p => ({ label: p.titulo.toUpperCase(), path: `/${p.slug}` })),
   ];
 
-  // Up to 3 items shown directly on tablet (md), 4 on desktop (lg/xl)
-  const MAX_DESKTOP_ITEMS = 3;
-  const desktopVisibleItems = allNavItems.slice(0, MAX_DESKTOP_ITEMS);
-  const desktopMoreItems = allNavItems.slice(MAX_DESKTOP_ITEMS);
+  // Dynamic header occupancy calculation:
+  // "MAIS" is only added when the header width is completely occupied.
+  const [visibleCount, setVisibleCount] = useState<number>(allNavItems.length);
+  const headerContainerRef = useRef<HTMLDivElement>(null);
+  const logoRef = useRef<HTMLButtonElement>(null);
+  const rightActionsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const calculateFittingItems = () => {
+      if (!headerContainerRef.current) {
+        setVisibleCount(allNavItems.length);
+        return;
+      }
+
+      const containerWidth = headerContainerRef.current.clientWidth;
+      const logoWidth = logoRef.current?.offsetWidth || 210;
+      const actionsWidth = rightActionsRef.current?.offsetWidth || 150;
+      
+      const windowWidth = window.innerWidth;
+      const gap = windowWidth >= 1280 ? 28 : windowWidth >= 1024 ? 20 : 12;
+
+      // Available space specifically for navigation links
+      const availableSpace = containerWidth - logoWidth - actionsWidth - 36;
+
+      let ctx: CanvasRenderingContext2D | null = null;
+      try {
+        const canvas = document.createElement('canvas');
+        ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.font = '500 12px "Plus Jakarta Sans", system-ui, -apple-system, sans-serif';
+        }
+      } catch {
+        // canvas fallback
+      }
+
+      // Calculate width for each nav item (text + letter-spacing + padding)
+      const itemWidths = allNavItems.map(item => {
+        const textWidth = ctx ? ctx.measureText(item.label).width : item.label.length * 8;
+        const tracking = item.label.length * 2.2;
+        return textWidth + tracking + 8;
+      });
+
+      // Total width of all items with gaps
+      const totalWidthAll = itemWidths.reduce((acc, w) => acc + w, 0) + Math.max(0, allNavItems.length - 1) * gap;
+
+      // Only show MAIS if header is totally occupied / unable to fit all items
+      if (totalWidthAll <= availableSpace) {
+        setVisibleCount(allNavItems.length);
+        return;
+      }
+
+      // If occupied, calculate how many items fit alongside the MAIS dropdown
+      const moreBtnWidth = 55 + (4 * 2.2) + 16 + 14 + gap;
+      let currentWidth = 0;
+      let count = 0;
+
+      for (let i = 0; i < itemWidths.length; i++) {
+        const nextWidth = currentWidth + itemWidths[i] + (count > 0 ? gap : 0);
+        if (nextWidth + moreBtnWidth <= availableSpace) {
+          currentWidth = nextWidth;
+          count++;
+        } else {
+          break;
+        }
+      }
+
+      setVisibleCount(Math.max(1, count));
+    };
+
+    calculateFittingItems();
+    window.addEventListener('resize', calculateFittingItems);
+    return () => window.removeEventListener('resize', calculateFittingItems);
+  }, [allNavItems]);
+
+  const desktopVisibleItems = allNavItems.slice(0, visibleCount);
+  const desktopMoreItems = allNavItems.slice(visibleCount);
 
   const handleNavClick = (path: string) => {
     onNavigate(path);
@@ -95,10 +167,14 @@ export const Header: React.FC<HeaderProps> = ({ currentPath, onNavigate, paginas
         Fixed height container (h-16 on mobile, h-20 on desktop)
         Prevents layout shifts, jittering and bouncing at scroll position boundaries
       */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3 sm:gap-4">
+      <div 
+        ref={headerContainerRef}
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3 sm:gap-4"
+      >
         
         {/* Logo Brand Link */}
         <button 
+          ref={logoRef}
           id="header-logo-btn"
           onClick={() => handleNavClick('/')} 
           className="flex items-center text-left focus:outline-none group cursor-pointer shrink-0"
@@ -130,7 +206,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath, onNavigate, paginas
             );
           })}
 
-          {/* More menu dropdown if items exceed visible limit */}
+          {/* More menu dropdown ONLY if items exceed fully occupied header */}
           {desktopMoreItems.length > 0 && (
             <div className="relative" ref={moreMenuRef}>
               <button
@@ -159,7 +235,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath, onNavigate, paginas
                     <button
                       key={item.path}
                       onClick={() => handleNavClick(item.path)}
-                      className="text-left px-4 py-2.5 text-xs uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
+                      className="text-left px-4 py-2.5 text-xs uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors cursor-pointer"
                     >
                       {item.label}
                     </button>
@@ -169,34 +245,37 @@ export const Header: React.FC<HeaderProps> = ({ currentPath, onNavigate, paginas
             </div>
           )}
 
-          {/* Instagram Link */}
-          <a
-            id="header-instagram-link"
-            href="https://www.instagram.com/olharesdacena/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400 hover:text-white flex items-center gap-1.5 transition-colors py-1.5 cursor-pointer whitespace-nowrap"
-            title="Instagram @olharesdacena (Abre em nova aba)"
-          >
-            <Instagram className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">INSTAGRAM</span>
-            <ArrowUpRight className="w-3 h-3 opacity-60 hidden xl:inline" />
-          </a>
+          {/* Right Action Utilities (Instagram + Search) */}
+          <div ref={rightActionsRef} className="flex items-center gap-3 lg:gap-5 xl:gap-7 shrink-0">
+            {/* Instagram Link */}
+            <a
+              id="header-instagram-link"
+              href="https://www.instagram.com/olharesdacena/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400 hover:text-white flex items-center gap-1.5 transition-colors py-1.5 cursor-pointer whitespace-nowrap"
+              title="Instagram @olharesdacena (Abre em nova aba)"
+            >
+              <Instagram className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">INSTAGRAM</span>
+              <ArrowUpRight className="w-3 h-3 opacity-60 hidden xl:inline" />
+            </a>
 
-          {/* Search Icon Trigger */}
-          <button
-            id="header-search-btn"
-            onClick={() => handleNavClick('/pesquisa')}
-            className={`p-2 transition-colors cursor-pointer rounded-none border ${
-              currentPath === '/pesquisa' 
-                ? 'text-white border-zinc-700 bg-zinc-900' 
-                : 'text-zinc-400 border-transparent hover:border-zinc-800 hover:text-white hover:bg-zinc-900/50'
-            }`}
-            aria-label="Pesquisar críticas"
-            title="Pesquisar no acervo"
-          >
-            <Search className="w-4 h-4" />
-          </button>
+            {/* Search Icon Trigger */}
+            <button
+              id="header-search-btn"
+              onClick={() => handleNavClick('/pesquisa')}
+              className={`p-2 transition-colors cursor-pointer rounded-none border ${
+                currentPath === '/pesquisa' 
+                  ? 'text-white border-zinc-700 bg-zinc-900' 
+                  : 'text-zinc-400 border-transparent hover:border-zinc-800 hover:text-white hover:bg-zinc-900/50'
+              }`}
+              aria-label="Pesquisar críticas"
+              title="Pesquisar no acervo"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+          </div>
         </nav>
 
         {/* Mobile Controls (Search + Hamburger) */}

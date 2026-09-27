@@ -12,6 +12,7 @@ import {
   subscribeToPaginas,
   subscribeToSitesInteressantes,
   subscribeToPremiosOlhares,
+  subscribeToAuth,
   getLocalCriticas,
   getLocalPaginas,
   getLocalSitesInteressantes,
@@ -78,28 +79,15 @@ export default function App() {
   // Initial Data Load and Auth state
   useEffect(() => {
     let isMounted = true;
-    let unsubAuth: (() => void) | undefined;
-    let unsubPaginas: (() => void) | undefined;
-    let unsubSites: (() => void) | undefined;
-    let unsubPremios: (() => void) | undefined;
 
-    // 1. Subscribe to Firebase auth ONLY if an admin session is active or on admin routes
-    const hasAdminSession = Boolean(localStorage.getItem('olhares_da_cena_admin_session'));
-    const isAdminRoute = window.location.pathname?.startsWith('/admin') || window.location.pathname === '/login';
+    // 1. Subscribe to Firebase auth
+    const unsubAuth = subscribeToAuth((user) => {
+      if (isMounted) {
+        setCurrentUser(user);
+      }
+    });
 
-    if (hasAdminSession || isAdminRoute) {
-      import('./services/auth').then(({ subscribeToAuth }) => {
-        if (isMounted) {
-          unsubAuth = subscribeToAuth((user) => {
-            if (isMounted) {
-              setCurrentUser(user);
-            }
-          });
-        }
-      });
-    }
-
-    // 2. Real-time subscription to Critiques across all devices (primary content)
+    // 2. Real-time subscription to Critiques across all devices
     const unsubCriticas = subscribeToCriticas((items) => {
       if (isMounted && items) {
         setCriticas(items);
@@ -107,35 +95,34 @@ export default function App() {
       }
     });
 
-    // 3. Defer secondary subscriptions until after critical initial mobile paint
-    const attachSecondarySubscriptions = () => {
-      if (!isMounted) return;
-      unsubPaginas = subscribeToPaginas((paginasData) => {
-        if (isMounted && paginasData) setPaginas(paginasData);
-      });
-      unsubSites = subscribeToSitesInteressantes((sitesData) => {
-        if (isMounted && sitesData) setSitesInteressantes(sitesData);
-      });
-      unsubPremios = subscribeToPremiosOlhares((premiosData) => {
-        if (isMounted && premiosData) setPremiosOlhares(premiosData);
-      });
-    };
-
-    if (typeof window !== 'undefined') {
-      if ('requestIdleCallback' in window) {
-        (window as any).requestIdleCallback(attachSecondarySubscriptions, { timeout: 2500 });
-      } else {
-        setTimeout(attachSecondarySubscriptions, 1500);
+    // 3. Real-time subscription to Pages
+    const unsubPaginas = subscribeToPaginas((paginasData) => {
+      if (isMounted && paginasData) {
+        setPaginas(paginasData);
       }
-    }
+    });
+
+    // 4. Real-time subscription to Sites Interessantes
+    const unsubSites = subscribeToSitesInteressantes((sitesData) => {
+      if (isMounted && sitesData) {
+        setSitesInteressantes(sitesData);
+      }
+    });
+
+    // 5. Real-time subscription to Prêmio Olhares da Cena
+    const unsubPremios = subscribeToPremiosOlhares((premiosData) => {
+      if (isMounted && premiosData) {
+        setPremiosOlhares(premiosData);
+      }
+    });
 
     return () => {
       isMounted = false;
-      if (unsubAuth) unsubAuth();
-      if (unsubCriticas) unsubCriticas();
-      if (unsubPaginas) unsubPaginas();
-      if (unsubSites) unsubSites();
-      if (unsubPremios) unsubPremios();
+      unsubAuth();
+      unsubCriticas();
+      unsubPaginas();
+      unsubSites();
+      unsubPremios();
     };
   }, []);
 

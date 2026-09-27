@@ -51,7 +51,6 @@ export const PesquisaPage: React.FC<PesquisaPageProps> = ({
       const matchState = c.estado?.toLowerCase().includes(term);
       const matchCategory = c.categoria?.toLowerCase().includes(term);
       const matchTags = c.tags?.some(t => t.toLowerCase().includes(term));
-      const matchFicha = c.fichaTecnica ? Object.values(c.fichaTecnica).some(val => typeof val === 'string' && val.toLowerCase().includes(term)) : false;
 
       return Boolean(
         matchTitle ||
@@ -63,8 +62,7 @@ export const PesquisaPage: React.FC<PesquisaPageProps> = ({
         matchCity ||
         matchState ||
         matchCategory ||
-        matchTags ||
-        matchFicha
+        matchTags
       );
     }).sort((a, b) => new Date(b.dataPublicacao).getTime() - new Date(a.dataPublicacao).getTime());
   }, [criticas, searchTerm, selectedCategory]);

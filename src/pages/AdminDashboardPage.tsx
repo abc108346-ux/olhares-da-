@@ -26,9 +26,9 @@ import {
   subscribeToSiteStats,
   getSiteStats,
   getLocalSiteStats,
-  updateSiteTotalViews
+  updateSiteTotalViews,
+  logoutAdminUser
 } from '../services/firebase';
-import { logoutAdminUser } from '../services/auth';
 import { Logo } from '../components/Logo';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { ImageUploadManager } from '../components/ImageUploadManager';
@@ -1809,10 +1809,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 />
               </div>
 
-              {/* Section 4: Ficha Técnica & Espetáculo */}
+              {/* Section 4: Informações do Espetáculo */}
               <div className="p-6 bg-zinc-950 border border-zinc-850 space-y-4">
                 <h3 className="font-display uppercase tracking-wider text-xs font-bold text-white border-b border-zinc-900 pb-2">
-                  4. ESPETÁCULO & FICHA TÉCNICA
+                  4. DADOS DO ESPETÁCULO (OPCIONAL)
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -1866,118 +1866,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                       placeholder="RS"
                       maxLength={2}
                       className="w-full bg-black text-white p-2.5 border border-zinc-800 uppercase font-mono text-xs focus:border-white focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block uppercase font-mono text-zinc-400 mb-1">
-                      Direção
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.fichaTecnica.direcao || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        fichaTecnica: { ...prev.fichaTecnica, direcao: e.target.value }
-                      }))}
-                      placeholder="Marcelo Manique"
-                      className="w-full bg-black text-white p-2.5 border border-zinc-800 text-xs focus:border-white focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block uppercase font-mono text-zinc-400 mb-1">
-                      Texto / Dramaturgia
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.fichaTecnica.texto || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        fichaTecnica: { ...prev.fichaTecnica, texto: e.target.value }
-                      }))}
-                      placeholder="Nikolai Gógol / Adaptação"
-                      className="w-full bg-black text-white p-2.5 border border-zinc-800 text-xs focus:border-white focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block uppercase font-mono text-zinc-400 mb-1">
-                      Elenco (Nomes separados por vírgula)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.fichaTecnica.elenco || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        fichaTecnica: { ...prev.fichaTecnica, elenco: e.target.value }
-                      }))}
-                      placeholder="Amanda Batista, Bianca Lazzaretti, Carlos Eduardo Souza..."
-                      className="w-full bg-black text-white p-2.5 border border-zinc-800 text-xs focus:border-white focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block uppercase font-mono text-zinc-400 mb-1">
-                      Cenografia
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.fichaTecnica.cenografia || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        fichaTecnica: { ...prev.fichaTecnica, cenografia: e.target.value }
-                      }))}
-                      placeholder="Lauro Vasconcelos"
-                      className="w-full bg-black text-white p-2.5 border border-zinc-800 text-xs focus:border-white focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block uppercase font-mono text-zinc-400 mb-1">
-                      Iluminação
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.fichaTecnica.iluminacao || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        fichaTecnica: { ...prev.fichaTecnica, iluminacao: e.target.value }
-                      }))}
-                      placeholder="Clarissa Moraes"
-                      className="w-full bg-black text-white p-2.5 border border-zinc-800 text-xs focus:border-white focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block uppercase font-mono text-zinc-400 mb-1">
-                      Trilha Sonora
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.fichaTecnica.trilhaSonora || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        fichaTecnica: { ...prev.fichaTecnica, trilhaSonora: e.target.value }
-                      }))}
-                      placeholder="Arthur Fontoura"
-                      className="w-full bg-black text-white p-2.5 border border-zinc-800 text-xs focus:border-white focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block uppercase font-mono text-zinc-400 mb-1">
-                      Duração
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.fichaTecnica.duracao || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        fichaTecnica: { ...prev.fichaTecnica, duracao: e.target.value }
-                      }))}
-                      placeholder="85 minutos"
-                      className="w-full bg-black text-white p-2.5 border border-zinc-800 text-xs focus:border-white focus:outline-none"
                     />
                   </div>
                 </div>
