@@ -83,28 +83,7 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
       </section>
 
       {/* =========================================================================
-          1. FRASE OLHARES DA CENA
-         ========================================================================= */}
-      <section id="home-manifesto-banner" className="border-y border-zinc-900 bg-zinc-950 py-12 sm:py-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-5 sm:space-y-6">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 border border-white rotate-45 mx-auto flex items-center justify-center mb-1">
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white" />
-          </div>
-
-          <blockquote className="font-serif italic text-lg sm:text-2xl lg:text-3xl text-zinc-200 leading-relaxed font-light whitespace-pre-wrap">
-            “{homeSettings.manifestoText}”
-          </blockquote>
-
-          <div className="pt-1 sm:pt-2">
-            <p className="text-xs uppercase tracking-[0.25em] text-zinc-500 font-mono">
-              {homeSettings.manifestoCaption}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          2. ÚLTIMA CRÍTICA LANÇADA (CRÍTICA EM DESTAQUE)
+          1. ÚLTIMA CRÍTICA LANÇADA (CRÍTICA EM DESTAQUE)
          ========================================================================= */}
       {featured ? (
         <section id="home-featured-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -129,7 +108,7 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
       ) : null}
 
       {/* =========================================================================
-          3. CRÍTICAS RECENTES
+          2. CRÍTICAS RECENTES
          ========================================================================= */}
       {recentCriticas.length > 0 ? (
         <section id="home-recent-criticas-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -193,6 +172,27 @@ export const HomePage: React.FC<HomePageProps> = ({ criticas, onNavigate, onSele
           </div>
         </section>
       ) : null)}
+
+      {/* =========================================================================
+          3. FRASE / MANIFESTO OLHARES DA CENA (ABAIXO DAS CRÍTICAS)
+         ========================================================================= */}
+      <section id="home-manifesto-banner" className="border-y border-zinc-900 bg-zinc-950 py-12 sm:py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-5 sm:space-y-6">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 border border-white rotate-45 mx-auto flex items-center justify-center mb-1">
+            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white" />
+          </div>
+
+          <blockquote className="font-serif italic text-lg sm:text-2xl lg:text-3xl text-zinc-200 leading-relaxed font-light whitespace-pre-wrap">
+            “{homeSettings.manifestoText}”
+          </blockquote>
+
+          <div className="pt-1 sm:pt-2">
+            <p className="text-xs uppercase tracking-[0.25em] text-zinc-500 font-mono">
+              {homeSettings.manifestoCaption}
+            </p>
+          </div>
+        </div>
+      </section>
 
       {/* =========================================================================
           4. BARRA DE PESQUISA (Acervo Search)
